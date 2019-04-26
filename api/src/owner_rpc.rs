@@ -17,12 +17,10 @@ use uuid::Uuid;
 
 use crate::core::core::Transaction;
 use crate::keychain::{Identifier, Keychain};
-use crate::libwallet::slate::Slate;
-use crate::libwallet::types::{
-	AcctPathMapping, InitTxArgs, NodeClient, NodeHeightResult, OutputCommitMapping, TxLogEntry,
-	WalletBackend, WalletInfo,
+use crate::libwallet::{
+	AcctPathMapping, ErrorKind, InitTxArgs, NodeClient, NodeHeightResult, OutputCommitMapping,
+	Slate, TxLogEntry, WalletBackend, WalletInfo,
 };
-use crate::libwallet::ErrorKind;
 use crate::Owner;
 use easy_jsonrpc;
 
@@ -1204,7 +1202,7 @@ pub fn run_doctest_owner(
 	let mut api_owner = Owner::new(wallet1.clone());
 	api_owner.doctest_mode = true;
 	let owner_api = &api_owner as &dyn OwnerRpc;
-	Ok(owner_api.handle_request(request))
+	Ok(owner_api.handle_request(request).as_option())
 }
 
 #[doc(hidden)]

@@ -14,11 +14,10 @@
 
 use crate::core::core::{self, amount_to_hr_string};
 use crate::core::global;
-use crate::libwallet::types::{
-	AcctPathMapping, OutputCommitMapping, OutputStatus, PaymentCommitMapping, TxLogEntry,
+use crate::libwallet::{
+	AcctPathMapping, Error, OutputCommitMapping, OutputStatus, PaymentCommitMapping, TxLogEntry,
 	WalletInfo,
 };
-use crate::libwallet::Error;
 use crate::util;
 use prettytable;
 use std::io::prelude::Write;

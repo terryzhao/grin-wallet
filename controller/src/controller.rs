@@ -20,12 +20,10 @@ use crate::core::core;
 use crate::core::core::Transaction;
 use crate::impls::{FileWalletCommAdapter, HTTPWalletCommAdapter, KeybaseWalletCommAdapter};
 use crate::keychain::Keychain;
-use crate::libwallet::slate::Slate;
-use crate::libwallet::types::{
-	CbData, InitTxArgs, NodeClient, OutputCommitMapping, SendTXArgs, TxLogEntry, WalletBackend,
-	WalletInfo,
+use crate::libwallet::{
+	CbData, Error, ErrorKind, InitTxArgs, NodeClient, OutputCommitMapping, SendTXArgs, Slate,
+	TxLogEntry, WalletBackend, WalletInfo,
 };
-use crate::libwallet::{Error, ErrorKind};
 use crate::util::to_base64;
 use crate::util::Mutex;
 use failure::ResultExt;
@@ -44,7 +42,7 @@ use uuid::Uuid;
 
 use crate::apiwallet::{Foreign, ForeignRpc, Owner, OwnerRpc};
 use easy_jsonrpc;
-use easy_jsonrpc::Handler;
+use easy_jsonrpc::{Handler, MaybeReply};
 
 lazy_static! {
 	pub static ref GRIN_OWNER_BASIC_REALM: HeaderValue =
@@ -687,10 +685,11 @@ where
 		Box::new(parse_body(req).and_then(move |val: serde_json::Value| {
 			let owner_api = &api as &dyn OwnerRpc;
 			match owner_api.handle_request(val) {
-				Some(r) => ok(r),
-				None => {
-					error!("OwnerAPI: call_api: failed with error");
-					err(ErrorKind::GenericError(format!("OwnerAPI Call Failed")).into())
+				MaybeReply::Reply(r) => ok(r),
+				MaybeReply::DontReply => {
+					// Since it's http, we need to return something. We return [] because jsonrpc
+					// clients will parse it as an empty batch response.
+					ok(serde_json::json!([]))
 				}
 			}
 		}))
@@ -866,10 +865,11 @@ where
 		Box::new(parse_body(req).and_then(move |val: serde_json::Value| {
 			let foreign_api = &api as &dyn ForeignRpc;
 			match foreign_api.handle_request(val) {
-				Some(r) => ok(r),
-				None => {
-					error!("ForeignAPI: call_api: failed with error");
-					err(ErrorKind::GenericError(format!("ForeignAPI Call Failed")).into())
+				MaybeReply::Reply(r) => ok(r),
+				MaybeReply::DontReply => {
+					// Since it's http, we need to return something. We return [] because jsonrpc
+					// clients will parse it as an empty batch response.
+					ok(serde_json::json!([]))
 				}
 			}
 		}))
