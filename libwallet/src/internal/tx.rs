@@ -72,7 +72,7 @@ pub fn estimate_send_tx<T: ?Sized, C, K>(
 	minimum_confirmations: u64,
 	max_outputs: usize,
 	num_change_outputs: usize,
-	selection_strategy_is_use_all: bool,
+	selection_strategy: String,
 	parent_key_id: &Identifier,
 ) -> Result<
 	(
@@ -105,7 +105,7 @@ where
 		minimum_confirmations,
 		max_outputs,
 		num_change_outputs,
-		selection_strategy_is_use_all,
+		selection_strategy,
 		parent_key_id,
 	)?;
 	Ok((total, fee))
@@ -118,7 +118,7 @@ pub fn add_inputs_to_slate<T: ?Sized, C, K>(
 	minimum_confirmations: u64,
 	max_outputs: usize,
 	num_change_outputs: usize,
-	selection_strategy_is_use_all: bool,
+	selection_strategy: String,
 	parent_key_id: &Identifier,
 	participant_id: usize,
 	message: Option<String>,
@@ -145,7 +145,7 @@ where
 		minimum_confirmations,
 		max_outputs,
 		num_change_outputs,
-		selection_strategy_is_use_all,
+		selection_strategy,
 		parent_key_id.clone(),
 		use_test_rng,
 	)?;

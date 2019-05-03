@@ -38,7 +38,7 @@ pub struct SendTXArgs {
 	/// Number of change outputs to generate
 	pub num_change_outputs: usize,
 	/// whether to use all outputs (combine)
-	pub selection_strategy_is_use_all: bool,
+	pub selection_strategy: String,
 	/// Optional message, that will be signed
 	pub message: Option<String>,
 	/// Optional slate version to target when sending
@@ -68,17 +68,19 @@ pub struct InitTxArgs {
 	/// The target number of change outputs to create in the transaction.
 	/// The actual number created will be `num_change_outputs` + whatever remainder is needed.
 	pub num_change_outputs: u32,
-	/// If `true`, attempt to use up as many outputs as
+	/// If `all`, attempt to use up as many outputs as
 	/// possible to create the transaction, up the 'soft limit' of `max_outputs`. This helps
 	/// to reduce the size of the UTXO set and the amount of data stored in the wallet, and
 	/// minimizes fees. This will generally result in many inputs and a large change output(s),
-	/// usually much larger than the amount being sent. If `false`, the transaction will include
-	/// as many outputs as are needed to meet the amount, (and no more) starting with the smallest
-	/// value outputs.
-	pub selection_strategy_is_use_all: bool,
+	/// usually much larger than the amount being sent.
+	/// If `smallest`, the transaction will include as many outputs as are needed to meet the amount,
+	/// and no more, starting with the smallest value outputs.
+	/// If `biggest`, the transaction will include as many outputs as are needed to meet the amount,
+	/// and no more, starting with the biggest value outputs.
+	pub selection_strategy: String,
 	/// An optional participant message to include alongside the sender's public
 	/// ParticipantData within the slate. This message will include a signature created with the
-	/// sender's private excess value, and will be publically verifiable. Note this message is for
+	/// sender's private excess value, and will be publicly verifiable. Note this message is for
 	/// the convenience of the participants during the exchange; it is not included in the final
 	/// transaction sent to the chain. The message will be truncated to 256 characters.
 	pub message: Option<String>,
@@ -120,7 +122,7 @@ impl Default for InitTxArgs {
 			minimum_confirmations: 10,
 			max_outputs: 500,
 			num_change_outputs: 1,
-			selection_strategy_is_use_all: true,
+			selection_strategy: "all".to_owned(),
 			message: None,
 			target_slate_version: None,
 			estimate_only: Some(false),

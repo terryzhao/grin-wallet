@@ -244,7 +244,7 @@ pub fn send(
 ) -> Result<(), Error> {
 	controller::owner_single_use(wallet.clone(), |api| {
 		if args.estimate_selection_strategies {
-			let strategies = vec!["smallest", "all"]
+			let strategies = vec!["smallest", "biggest", "all"]
 				.into_iter()
 				.map(|strategy| {
 					let init_args = InitTxArgs {
@@ -253,7 +253,7 @@ pub fn send(
 						minimum_confirmations: args.minimum_confirmations,
 						max_outputs: args.max_outputs as u32,
 						num_change_outputs: args.change_outputs as u32,
-						selection_strategy_is_use_all: strategy == "all",
+						selection_strategy: strategy.to_owned(),
 						estimate_only: Some(true),
 						..Default::default()
 					};
@@ -269,7 +269,7 @@ pub fn send(
 				minimum_confirmations: args.minimum_confirmations,
 				max_outputs: args.max_outputs as u32,
 				num_change_outputs: args.change_outputs as u32,
-				selection_strategy_is_use_all: args.selection_strategy == "all",
+				selection_strategy: args.selection_strategy.clone(),
 				message: args.message.clone(),
 				target_slate_version: args.target_slate_version,
 				send_args: None,
@@ -282,7 +282,7 @@ pub fn send(
 						"Tx created: {} grin to {} (strategy '{}')",
 						core::amount_to_hr_string(args.amount, false),
 						args.dest,
-						args.selection_strategy,
+						args.selection_strategy.clone(),
 					);
 					s
 				}

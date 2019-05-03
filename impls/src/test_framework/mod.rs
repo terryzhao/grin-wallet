@@ -202,7 +202,7 @@ where
 			minimum_confirmations: 2,
 			max_outputs: 500,
 			num_change_outputs: 1,
-			selection_strategy_is_use_all: true,
+			selection_strategy: "all".to_owned(),
 			..Default::default()
 		};
 		let slate_i = owner::initiate_tx(&mut *w, args, test_mode)?;

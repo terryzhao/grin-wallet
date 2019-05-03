@@ -21,6 +21,7 @@ use crate::grin_keychain::{Identifier, Keychain};
 use crate::internal::keys;
 use crate::slate::Slate;
 use crate::types::*;
+use std::cmp::Reverse;
 use std::collections::HashMap;
 
 /// Initialize a transaction on the sender side, returns a corresponding
@@ -34,7 +35,7 @@ pub fn build_send_tx<T: ?Sized, C, K>(
 	minimum_confirmations: u64,
 	max_outputs: usize,
 	change_outputs: usize,
-	selection_strategy_is_use_all: bool,
+	selection_strategy: String,
 	parent_key_id: Identifier,
 	use_test_nonce: bool,
 ) -> Result<Context, Error>
@@ -51,7 +52,7 @@ where
 		slate.lock_height,
 		max_outputs,
 		change_outputs,
-		selection_strategy_is_use_all,
+		selection_strategy,
 		&parent_key_id,
 	)?;
 
@@ -244,7 +245,7 @@ pub fn select_send_tx<T: ?Sized, C, K>(
 	lock_height: u64,
 	max_outputs: usize,
 	change_outputs: usize,
-	selection_strategy_is_use_all: bool,
+	selection_strategy: String,
 	parent_key_id: &Identifier,
 ) -> Result<
 	(
@@ -267,7 +268,7 @@ where
 		minimum_confirmations,
 		max_outputs,
 		change_outputs,
-		selection_strategy_is_use_all,
+		selection_strategy,
 		&parent_key_id,
 	)?;
 
@@ -290,7 +291,7 @@ pub fn select_coins_and_fee<T: ?Sized, C, K>(
 	minimum_confirmations: u64,
 	max_outputs: usize,
 	change_outputs: usize,
-	selection_strategy_is_use_all: bool,
+	selection_strategy: String,
 	parent_key_id: &Identifier,
 ) -> Result<
 	(
@@ -313,7 +314,7 @@ where
 		current_height,
 		minimum_confirmations,
 		max_outputs,
-		selection_strategy_is_use_all,
+		selection_strategy.clone(),
 		parent_key_id,
 	);
 
@@ -375,7 +376,7 @@ where
 				current_height,
 				minimum_confirmations,
 				max_outputs,
-				selection_strategy_is_use_all,
+				selection_strategy.clone(),
 				parent_key_id,
 			)
 			.1;
@@ -471,7 +472,7 @@ pub fn select_coins<T: ?Sized, C, K>(
 	current_height: u64,
 	minimum_confirmations: u64,
 	max_outputs: usize,
-	select_all: bool,
+	selection_strategy: String,
 	parent_key_id: &Identifier,
 ) -> (usize, Vec<OutputData>)
 //    max_outputs_available, Outputs
@@ -491,8 +492,13 @@ where
 
 	let max_available = eligible.len();
 
-	// sort eligible outputs by increasing value
-	eligible.sort_by_key(|out| out.value);
+	// sort eligible outputs by increasing value ("smallest" strategy) or
+	// decreasing value ("biggest" selection strategy)
+	if selection_strategy == "biggest" {
+		eligible.sort_by_key(|out| Reverse(out.value));
+	} else {
+		eligible.sort_by_key(|out| out.value);
+	}
 
 	// use a sliding window to identify potential sets of possible outputs to spend
 	// Case of amount > total amount of max_outputs(500):
@@ -504,15 +510,25 @@ where
 	// wants to send. So the wallet considers max_outputs more of a soft limit.
 	if eligible.len() > max_outputs {
 		for window in eligible.windows(max_outputs) {
-			let windowed_eligibles = window.iter().cloned().collect::<Vec<_>>();
-			if let Some(outputs) = select_from(amount, select_all, windowed_eligibles) {
+			let windowed_eligible = window.iter().cloned().collect::<Vec<_>>();
+			if let Some(outputs) =
+				select_from(amount, selection_strategy.clone(), windowed_eligible)
+			{
 				return (max_available, outputs);
 			}
 		}
 		// Not exist in any window of which total amount >= amount.
 		// Then take coins from the smallest one up to the total amount of selected
 		// coins = the amount.
-		if let Some(outputs) = select_from(amount, false, eligible.clone()) {
+		if let Some(outputs) = select_from(
+			amount,
+			if selection_strategy == "all" {
+				"smallest".to_owned()
+			} else {
+				selection_strategy.clone()
+			},
+			eligible.clone(),
+		) {
 			debug!(
 				"Extending maximum number of outputs. {} outputs selected.",
 				outputs.len()
@@ -520,7 +536,7 @@ where
 			return (max_available, outputs);
 		}
 	} else {
-		if let Some(outputs) = select_from(amount, select_all, eligible.clone()) {
+		if let Some(outputs) = select_from(amount, selection_strategy, eligible.clone()) {
 			return (max_available, outputs);
 		}
 	}
@@ -535,10 +551,14 @@ where
 	)
 }
 
-fn select_from(amount: u64, select_all: bool, outputs: Vec<OutputData>) -> Option<Vec<OutputData>> {
+fn select_from(
+	amount: u64,
+	selection_strategy: String,
+	outputs: Vec<OutputData>,
+) -> Option<Vec<OutputData>> {
 	let total = outputs.iter().fold(0, |acc, x| acc + x.value);
 	if total >= amount {
-		if select_all {
+		if selection_strategy == "all" {
 			return Some(outputs.iter().cloned().collect());
 		} else {
 			let mut selected_amount = 0;

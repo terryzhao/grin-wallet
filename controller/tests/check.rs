@@ -184,7 +184,7 @@ fn check_repair_impl(test_dir: &str) -> Result<(), libwallet::Error> {
 			minimum_confirmations: cm,
 			max_outputs: 500,
 			num_change_outputs: 1,
-			selection_strategy_is_use_all: true,
+			selection_strategy: "all".to_owned(),
 			..Default::default()
 		};
 		let mut slate = api.initiate_tx(args)?;
@@ -223,9 +223,10 @@ fn check_repair_impl(test_dir: &str) -> Result<(), libwallet::Error> {
 
 fn two_wallets_one_seed_impl(test_dir: &str) -> Result<(), libwallet::Error> {
 	setup(test_dir);
-	let seed_phrase = "affair pistol cancel crush garment candy ancient flag work \
-	                   market crush dry stand focus mutual weapon offer ceiling rival turn team spring \
-	                   where swift";
+	let seed_phrase =
+		"affair pistol cancel crush garment candy ancient flag work \
+		 market crush dry stand focus mutual weapon offer ceiling rival turn team spring \
+		 where swift";
 
 	// Create a new proxy to simulate server and wallet responses
 	let mut wallet_proxy: WalletProxy<LocalWalletClient, ExtKeychain> = WalletProxy::new(test_dir);

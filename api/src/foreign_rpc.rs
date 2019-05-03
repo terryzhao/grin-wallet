@@ -467,7 +467,7 @@ pub fn run_doctest_foreign(
 			minimum_confirmations: 2,
 			max_outputs: 500,
 			num_change_outputs: 1,
-			selection_strategy_is_use_all: true,
+			selection_strategy: "all".to_owned(),
 			..Default::default()
 		};
 		let slate = api_impl::owner::initiate_tx(&mut *w, args, true).unwrap();

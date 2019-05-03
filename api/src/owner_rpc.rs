@@ -331,7 +331,7 @@ pub trait OwnerRpc {
 					"minimum_confirmations": 2,
 					"max_outputs": 500,
 					"num_change_outputs": 1,
-					"selection_strategy_is_use_all": true,
+					"selection_strategy": "all",
 					"message": "my message",
 					"target_slate_version": null,
 					"send_args": null
@@ -1172,7 +1172,7 @@ pub fn run_doctest_owner(
 			minimum_confirmations: 2,
 			max_outputs: 500,
 			num_change_outputs: 1,
-			selection_strategy_is_use_all: true,
+			selection_strategy: "all".to_owned(),
 			..Default::default()
 		};
 		let mut slate = api_impl::owner::initiate_tx(&mut *w, args, true).unwrap();

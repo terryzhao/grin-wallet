@@ -93,7 +93,7 @@ fn self_send_test_impl(test_dir: &str) -> Result<(), libwallet::Error> {
 			minimum_confirmations: 2,
 			max_outputs: 500,
 			num_change_outputs: 1,
-			selection_strategy_is_use_all: true,
+			selection_strategy: "all".to_owned(),
 			..Default::default()
 		};
 		let mut slate = api.initiate_tx(args)?;

@@ -192,7 +192,7 @@ where
 			args.minimum_confirmations,
 			args.max_outputs as usize,
 			args.num_change_outputs as usize,
-			args.selection_strategy_is_use_all,
+			args.selection_strategy,
 			&parent_key_id,
 		)?;
 		slate.amount = total;
@@ -206,7 +206,7 @@ where
 		args.minimum_confirmations,
 		args.max_outputs as usize,
 		args.num_change_outputs as usize,
-		args.selection_strategy_is_use_all,
+		args.selection_strategy,
 		&parent_key_id,
 		0,
 		message,

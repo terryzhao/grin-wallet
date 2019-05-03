@@ -520,7 +520,7 @@ where
 	/// 	minimum_confirmations: 2,
 	/// 	max_outputs: 500,
 	/// 	num_change_outputs: 1,
-	/// 	selection_strategy_is_use_all: true,
+	/// 	selection_strategy: "all".to_owned(),
 	/// 	message: Some("Have some Grins. Love, Yeastplume".to_owned()),
 	/// 	..Default::default()
 	/// };
@@ -612,7 +612,7 @@ where
 	/// 	minimum_confirmations: 10,
 	/// 	max_outputs: 500,
 	/// 	num_change_outputs: 1,
-	/// 	selection_strategy_is_use_all: true,
+	/// 	selection_strategy: "all".to_owned(),
 	/// 	message: Some("Remember to lock this when we're happy this is sent".to_owned()),
 	/// 	..Default::default()
 	/// };
@@ -670,7 +670,7 @@ where
 	/// 	minimum_confirmations: 10,
 	/// 	max_outputs: 500,
 	/// 	num_change_outputs: 1,
-	/// 	selection_strategy_is_use_all: true,
+	/// 	selection_strategy: "all".to_owned(),
 	/// 	message: Some("Finalize this tx now".to_owned()),
 	/// 	..Default::default()
 	/// };
@@ -727,7 +727,7 @@ where
 	/// 	minimum_confirmations: 10,
 	/// 	max_outputs: 500,
 	/// 	num_change_outputs: 1,
-	/// 	selection_strategy_is_use_all: true,
+	/// 	selection_strategy: "all".to_owned(),
 	/// 	message: Some("Post this tx".to_owned()),
 	/// 	..Default::default()
 	/// };
@@ -788,7 +788,7 @@ where
 	/// 	minimum_confirmations: 10,
 	/// 	max_outputs: 500,
 	/// 	num_change_outputs: 1,
-	/// 	selection_strategy_is_use_all: true,
+	/// 	selection_strategy: "all".to_owned(),
 	/// 	message: Some("Cancel this tx".to_owned()),
 	/// 	..Default::default()
 	/// };
@@ -881,7 +881,7 @@ where
 	/// 	minimum_confirmations: 10,
 	/// 	max_outputs: 500,
 	/// 	num_change_outputs: 1,
-	/// 	selection_strategy_is_use_all: true,
+	/// 	selection_strategy: "all".to_owned(),
 	/// 	message: Some("Just verify messages".to_owned()),
 	/// 	..Default::default()
 	/// };

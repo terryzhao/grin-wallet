@@ -74,7 +74,7 @@ fn basic_transaction_api(test_dir: &str) -> Result<(), libwallet::Error> {
 	// few values to keep things shorter
 	let reward = core::consensus::REWARD;
 	let cm = global::coinbase_maturity(); // assume all testing precedes soft fork height
-									  // mine a few blocks
+									   // mine a few blocks
 	let _ = test_framework::award_blocks_to_wallet(&chain, wallet1.clone(), 10, false);
 
 	// Check wallet 1 contents are as expected
@@ -105,7 +105,7 @@ fn basic_transaction_api(test_dir: &str) -> Result<(), libwallet::Error> {
 			minimum_confirmations: 2,
 			max_outputs: 500,
 			num_change_outputs: 1,
-			selection_strategy_is_use_all: true,
+			selection_strategy: "all".to_owned(),
 			..Default::default()
 		};
 		let slate_i = sender_api.initiate_tx(args)?;
@@ -257,7 +257,7 @@ fn basic_transaction_api(test_dir: &str) -> Result<(), libwallet::Error> {
 			minimum_confirmations: 2,
 			max_outputs: 500,
 			num_change_outputs: 1,
-			selection_strategy_is_use_all: true,
+			selection_strategy: "all".to_owned(),
 			estimate_only: Some(true),
 			..Default::default()
 		};
@@ -271,7 +271,7 @@ fn basic_transaction_api(test_dir: &str) -> Result<(), libwallet::Error> {
 			minimum_confirmations: 2,
 			max_outputs: 500,
 			num_change_outputs: 1,
-			selection_strategy_is_use_all: false, //select smallest number
+			selection_strategy: "smallest".to_owned(),
 			estimate_only: Some(true),
 			..Default::default()
 		};
@@ -292,7 +292,7 @@ fn basic_transaction_api(test_dir: &str) -> Result<(), libwallet::Error> {
 			minimum_confirmations: 2,
 			max_outputs: 500,
 			num_change_outputs: 1,
-			selection_strategy_is_use_all: true,
+			selection_strategy: "all".to_owned(),
 			..Default::default()
 		};
 		let slate_i = sender_api.initiate_tx(args)?;
@@ -378,7 +378,7 @@ fn tx_rollback(test_dir: &str) -> Result<(), libwallet::Error> {
 	// few values to keep things shorter
 	let reward = core::consensus::REWARD;
 	let cm = global::coinbase_maturity(); // assume all testing precedes soft fork height
-									  // mine a few blocks
+									   // mine a few blocks
 	let _ = test_framework::award_blocks_to_wallet(&chain, wallet1.clone(), 5, false);
 
 	let amount = 30_000_000_000;
@@ -391,7 +391,7 @@ fn tx_rollback(test_dir: &str) -> Result<(), libwallet::Error> {
 			minimum_confirmations: 2,
 			max_outputs: 500,
 			num_change_outputs: 1,
-			selection_strategy_is_use_all: true,
+			selection_strategy: "all".to_owned(),
 			..Default::default()
 		};
 
