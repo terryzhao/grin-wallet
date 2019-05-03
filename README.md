@@ -7,3 +7,17 @@
 [![License](https://img.shields.io/github/license/gottstech/grin-wallet.svg)](https://github.com/gottstech/grin-wallet/blob/master/LICENSE)
 
 # Grin Wallet
+
+The command line wallet for [Grin](https://github.com/mimblewimble/grin).
+
+# User Guide
+
+https://github.com/gottstech/grin-wallet/wiki
+
+# API Guide
+
+https://github.com/gottstech/grin-wallet/wiki
+
+
+
+
