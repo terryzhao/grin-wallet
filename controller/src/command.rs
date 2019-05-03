@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::util::{Mutex, ZeroingString};
+use chrono::NaiveDateTime as DateTime;
 use std::collections::HashMap;
 /// Grin wallet command-line function implementations
 use std::fs::File;
@@ -35,7 +36,7 @@ use crate::impls::{
 	LMDBBackend, NullWalletCommAdapter,
 };
 use crate::impls::{HTTPNodeClient, WalletSeed};
-use crate::libwallet::{InitTxArgs, NodeClient, WalletInst};
+use crate::libwallet::{InitTxArgs, NodeClient, OutputStatus, TxLogEntryType, WalletInst};
 use crate::{controller, display};
 
 /// Arguments common to all wallet commands
@@ -419,29 +420,102 @@ pub fn info(
 	Ok(())
 }
 
+/// Outputs command args
+pub struct OutputsArgs {
+	pub minvalue: Option<u64>,
+	pub status: Option<OutputStatus>,
+	pub limit: Option<u64>,
+}
+
 pub fn outputs(
 	wallet: Arc<Mutex<WalletInst<impl NodeClient + 'static, keychain::ExtKeychain>>>,
 	g_args: &GlobalArgs,
+	args: OutputsArgs,
 	dark_scheme: bool,
 ) -> Result<(), Error> {
 	controller::owner_single_use(wallet.clone(), |api| {
 		let res = api.node_height()?;
 		let (validated, outputs) = api.retrieve_outputs(g_args.show_spent, true, None)?;
-		display::outputs(&g_args.account, res.height, validated, outputs, dark_scheme)?;
+
+		// filter by value
+		let mut filtered_outputs = if let Some(minvalue) = args.minvalue {
+			outputs
+				.into_iter()
+				.filter(|out| out.output.value >= minvalue)
+				.collect::<Vec<_>>()
+		} else {
+			outputs
+		};
+
+		// filter by status
+		if let Some(status) = args.status {
+			filtered_outputs = filtered_outputs
+				.into_iter()
+				.filter(|out| out.output.status == status)
+				.collect::<Vec<_>>();
+		}
+
+		// limit the display lines
+		if let Some(limit) = args.limit {
+			if (limit as usize) < filtered_outputs.len() {
+				let drop = filtered_outputs.len() - limit as usize;
+				filtered_outputs = filtered_outputs.drain(drop..).collect();
+			}
+		}
+
+		display::outputs(
+			&g_args.account,
+			res.height,
+			validated,
+			filtered_outputs,
+			dark_scheme,
+		)?;
 		Ok(())
 	})?;
 	Ok(())
 }
 
+/// Payments command args
+pub struct PaymentsArgs {
+	pub status: Option<OutputStatus>,
+	pub limit: Option<u64>,
+}
+
 pub fn payments(
 	wallet: Arc<Mutex<WalletInst<impl NodeClient + 'static, keychain::ExtKeychain>>>,
 	g_args: &GlobalArgs,
+	args: PaymentsArgs,
 	dark_scheme: bool,
 ) -> Result<(), Error> {
 	controller::owner_single_use(wallet.clone(), |api| {
 		let res = api.node_height()?;
 		let (validated, outputs) = api.retrieve_payments(true, None)?;
-		display::payments(&g_args.account, res.height, validated, outputs, dark_scheme)?;
+
+		// filter by status
+		let mut filtered_outputs = if let Some(status) = args.status {
+			outputs
+				.into_iter()
+				.filter(|out| out.output.status == status)
+				.collect::<Vec<_>>()
+		} else {
+			outputs
+		};
+
+		// limit the display lines
+		if let Some(limit) = args.limit {
+			if (limit as usize) < filtered_outputs.len() {
+				let drop = filtered_outputs.len() - limit as usize;
+				filtered_outputs = filtered_outputs.drain(drop..).collect();
+			}
+		}
+
+		display::payments(
+			&g_args.account,
+			res.height,
+			validated,
+			filtered_outputs,
+			dark_scheme,
+		)?;
 		Ok(())
 	})?;
 	Ok(())
@@ -450,6 +524,10 @@ pub fn payments(
 /// Txs command args
 pub struct TxsArgs {
 	pub id: Option<u32>,
+	pub tx_type: Option<TxLogEntryType>,
+	pub start_date: Option<DateTime>,
+	pub end_date: Option<DateTime>,
+	pub limit: Option<u64>,
 }
 
 pub fn txs(
@@ -462,11 +540,45 @@ pub fn txs(
 		let res = api.node_height()?;
 		let (validated, txs) = api.retrieve_txs(true, args.id, None)?;
 		let include_status = !args.id.is_some();
+
+		let mut filtered_txs;
+		{
+			// Filter by tx type
+			filtered_txs = if let Some(tx_type) = args.tx_type {
+				txs.into_iter()
+					.filter(|tx| tx.tx_type == tx_type)
+					.collect::<Vec<_>>()
+			} else {
+				txs
+			};
+
+			// Filter by date
+			if let Some(start_date) = args.start_date {
+				if let Some(end_date) = args.end_date {
+					filtered_txs = filtered_txs
+						.into_iter()
+						.filter(|tx| {
+							tx.creation_ts.naive_local() >= start_date
+								&& tx.creation_ts.naive_local() <= end_date
+						})
+						.collect::<Vec<_>>();
+				}
+			}
+
+			// limit the display lines
+			if let Some(limit) = args.limit {
+				if (limit as usize) < filtered_txs.len() {
+					let drop = filtered_txs.len() - limit as usize;
+					filtered_txs = filtered_txs.drain(drop..).collect();
+				}
+			}
+		}
+
 		display::txs(
 			&g_args.account,
 			res.height,
 			validated,
-			&txs,
+			&filtered_txs,
 			include_status,
 			dark_scheme,
 		)?;
@@ -476,7 +588,7 @@ pub fn txs(
 			let (_, outputs) = api.retrieve_outputs(true, false, args.id)?;
 			display::outputs(&g_args.account, res.height, validated, outputs, dark_scheme)?;
 			// should only be one here, but just in case
-			for tx in &txs {
+			for tx in &filtered_txs {
 				let (_, outputs) = api.retrieve_payments(true, tx.tx_slate_id)?;
 				if outputs.len() > 0 {
 					display::payments(
@@ -490,7 +602,7 @@ pub fn txs(
 			}
 
 			// should only be one here, but just in case
-			for tx in &txs {
+			for tx in &filtered_txs {
 				display::tx_messages(tx, dark_scheme)?;
 			}
 		};
