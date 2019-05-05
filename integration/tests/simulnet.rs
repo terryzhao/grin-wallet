@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate grin_apiwallet as apiwallet;
-extern crate grin_libwallet as libwallet;
-extern crate grin_refwallet as wallet;
+extern crate grin_wallet_api as apiwallet;
 extern crate grin_wallet_config as wallet_config;
+extern crate grin_wallet_libwallet as libwallet;
 #[macro_use]
 extern crate log;
 
