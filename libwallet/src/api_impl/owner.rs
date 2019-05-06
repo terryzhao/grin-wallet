@@ -326,6 +326,20 @@ where
 	w.restore()
 }
 
+/// Attempt to restore contents of wallet on batch
+pub fn restore_batch<T: ?Sized, C, K>(
+	w: &mut T,
+	start_index: u64,
+	batch_size: u64,
+) -> Result<(u64, u64), Error>
+where
+	T: WalletBackend<C, K>,
+	C: NodeClient,
+	K: Keychain,
+{
+	w.restore_batch(start_index, batch_size)
+}
+
 /// check repair
 pub fn check_repair<T: ?Sized, C, K>(w: &mut T, delete_unconfirmed: bool) -> Result<(), Error>
 where

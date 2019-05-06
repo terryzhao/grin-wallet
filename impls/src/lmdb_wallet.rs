@@ -30,7 +30,7 @@ use crate::store::{self, option_to_not_found, to_key, to_key_u64};
 
 use crate::core::core::Transaction;
 use crate::core::{global, ser};
-use crate::libwallet::{check_repair, restore};
+use crate::libwallet::{check_repair, restore, restore_batch};
 use crate::libwallet::{
 	AcctPathMapping, Context, Error, ErrorKind, NodeClient, OutputData, PaymentCommits,
 	PaymentData, TxLogEntry, WalletBackend, WalletOutputBatch,
@@ -372,6 +372,11 @@ where
 	fn restore(&mut self) -> Result<(), Error> {
 		restore(self).context(ErrorKind::Restore)?;
 		Ok(())
+	}
+
+	fn restore_batch(&mut self, start_index: u64, batch_size: u64) -> Result<(u64, u64), Error> {
+		let res = restore_batch(self, start_index, batch_size).context(ErrorKind::Restore)?;
+		Ok(res)
 	}
 
 	fn check_repair(&mut self, delete_unconfirmed: bool) -> Result<(), Error> {

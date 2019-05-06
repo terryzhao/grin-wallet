@@ -133,6 +133,9 @@ where
 	/// Attempt to restore the contents of a wallet from seed
 	fn restore(&mut self) -> Result<(), Error>;
 
+	/// Attempt to restore the contents of a wallet from seed on batch outputs
+	fn restore_batch(&mut self, start_index: u64, batch_size: u64) -> Result<(u64, u64), Error>;
+
 	/// Attempt to check and fix wallet state
 	fn check_repair(&mut self, delete_unconfirmed: bool) -> Result<(), Error>;
 }

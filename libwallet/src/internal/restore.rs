@@ -389,34 +389,22 @@ where
 	Ok(())
 }
 
-/// Restore a wallet
-pub fn restore<T, C, K>(wallet: &mut T) -> Result<(), Error>
+fn restore_from_outputs<T, C, K>(wallet: &mut T, outputs: Vec<OutputResult>) -> Result<(), Error>
 where
 	T: WalletBackend<C, K>,
 	C: NodeClient,
 	K: Keychain,
 {
-	// Don't proceed if wallet_data has anything in it
-	let is_empty = wallet.iter().next().is_none();
-	if !is_empty {
-		error!("Not restoring. Please back up and remove existing db directory first.");
-		return Ok(());
-	}
-
-	warn!("Starting restore.");
-
-	let result_vec = collect_chain_outputs(wallet)?;
-
 	warn!(
 		"Identified {} wallet_outputs as belonging to this wallet",
-		result_vec.len(),
+		outputs.len(),
 	);
 
 	let mut found_parents: HashMap<Identifier, u32> = HashMap::new();
 	let mut restore_stats = HashMap::new();
 
 	// Now save what we have
-	for output in result_vec {
+	for output in outputs {
 		restore_missing_output(
 			wallet,
 			output,
@@ -452,4 +440,47 @@ where
 		batch.commit()?;
 	}
 	Ok(())
+}
+
+/// Restore a wallet
+pub fn restore<T, C, K>(wallet: &mut T) -> Result<(), Error>
+where
+	T: WalletBackend<C, K>,
+	C: NodeClient,
+	K: Keychain,
+{
+	// Don't proceed if wallet_data has anything in it
+	let is_empty = wallet.iter().next().is_none();
+	if !is_empty {
+		error!("Not restoring. Please back up and remove existing db directory first.");
+		return Ok(());
+	}
+
+	warn!("Starting restore.");
+
+	let result_vec = collect_chain_outputs(wallet)?;
+
+	restore_from_outputs(wallet, result_vec)
+}
+
+/// Restore outputs by index on batch
+pub fn restore_batch<T, C, K>(
+	wallet: &mut T,
+	start_index: u64,
+	batch_size: u64,
+) -> Result<(u64, u64), Error>
+where
+	T: WalletBackend<C, K>,
+	C: NodeClient,
+	K: Keychain,
+{
+	let mut result_vec: Vec<OutputResult> = vec![];
+	let (highest_index, last_retrieved_index, outputs) = wallet
+		.w2n_client()
+		.get_outputs_by_pmmr_index(start_index, batch_size)?;
+
+	result_vec.append(&mut identify_utxo_outputs(wallet, outputs.clone())?);
+
+	restore_from_outputs(wallet, result_vec)?;
+	Ok((highest_index, last_retrieved_index))
 }
