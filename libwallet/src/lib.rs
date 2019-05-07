@@ -44,7 +44,7 @@ mod error;
 mod internal;
 mod slate;
 pub mod slate_versions;
-mod types;
+pub mod types;
 
 pub use crate::error::{Error, ErrorKind};
 pub use crate::slate::{ParticipantData, ParticipantMessageData, Slate};

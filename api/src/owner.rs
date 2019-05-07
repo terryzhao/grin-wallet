@@ -946,6 +946,48 @@ where
 		res
 	}
 
+	/// Scans the UTXO set on batch (from a start_index for a batch size) from the node, creating
+	/// outputs for each scanned output that matches the wallet's master seed. This function is
+	/// intended to be called as part of a recovery process (either from BIP32 phrase or backup
+	/// seed files,).
+	///
+	/// This operation scans the chain UTXO sets starting from a PMMR index, and is expected to be
+	/// NOT too time intensive because of a small `batch_size` such as 1,000. It is imperative
+	/// that no other processes should be trying to use the wallet at the same time this function is
+	/// running.
+	///
+	/// A single [TxLogEntry](../grin_wallet_libwallet/types/struct.TxLogEntry.html) is created for
+	/// all non-coinbase outputs discovered and restored during this process. A separate entry
+	/// is created for each coinbase output.
+	///
+	/// # Arguments
+	///
+	/// * None
+	///
+	/// # Returns
+	/// * `Ok((highest_index, last_retrieved_index))` if successful
+	/// * or [`libwallet::Error`](../grin_wallet_libwallet/struct.Error.html) if an error is encountered.
+
+	/// # Example
+	/// Set up as in [`new`](struct.Owner.html#method.new) method above.
+	/// ```
+	/// # grin_wallet_api::doctest_helper_setup_doc_env!(wallet, wallet_config);
+	///
+	/// let mut api_owner = Owner::new(wallet.clone());
+	/// let result = api_owner.restore_batch(1, 1000);
+	///
+	/// if let Ok((highest_index, last_retrieved_index)) = result {
+	///		// ...
+	/// }
+	/// ```
+	pub fn restore_batch(&self, start_index: u64, batch_size: u64) -> Result<(u64, u64), Error> {
+		let mut w = self.wallet.lock();
+		w.open_with_credentials()?;
+		let res = owner::restore_batch(&mut *w, start_index, batch_size);
+		w.close()?;
+		res
+	}
+
 	/// Scans the entire UTXO set from the node, identify which outputs belong to the given wallet
 	/// update the wallet state to be consistent with what's currently in the UTXO set.
 	///
