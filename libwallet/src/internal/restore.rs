@@ -265,23 +265,16 @@ where
 	Ok(())
 }
 
-/// Check / repair wallet contents
-/// assume wallet contents have been freshly updated with contents
-/// of latest block
-pub fn check_repair<T, C, K>(wallet: &mut T, delete_unconfirmed: bool) -> Result<(), Error>
+fn check_repair_from_outputs<T, C, K>(
+	wallet: &mut T,
+	delete_unconfirmed: bool,
+	chain_outs: Vec<OutputResult>,
+) -> Result<(), Error>
 where
 	T: WalletBackend<C, K>,
 	C: NodeClient,
 	K: Keychain,
 {
-	// First, get a definitive list of outputs we own from the chain
-	warn!("Starting wallet check.");
-	let chain_outs = collect_chain_outputs(wallet)?;
-	warn!(
-		"Identified {} wallet_outputs as belonging to this wallet",
-		chain_outs.len(),
-	);
-
 	// Now, get all outputs owned by this wallet (regardless of account)
 	let wallet_outputs = {
 		let res = updater::retrieve_outputs(&mut *wallet, true, None, None, None)?;
@@ -387,6 +380,52 @@ where
 		batch.commit()?;
 	}
 	Ok(())
+}
+
+/// Check / repair wallet contents
+/// assume wallet contents have been freshly updated with contents
+/// of latest block
+pub fn check_repair<T, C, K>(wallet: &mut T, delete_unconfirmed: bool) -> Result<(), Error>
+where
+	T: WalletBackend<C, K>,
+	C: NodeClient,
+	K: Keychain,
+{
+	// First, get a definitive list of outputs we own from the chain
+	warn!("Starting wallet check.");
+	let chain_outs = collect_chain_outputs(wallet)?;
+	warn!(
+		"Identified {} wallet_outputs as belonging to this wallet",
+		chain_outs.len(),
+	);
+
+	check_repair_from_outputs(wallet, delete_unconfirmed, chain_outs)?;
+	Ok(())
+}
+
+/// Check / repair wallet contents, by index on batch
+/// assume wallet contents have been freshly updated with contents
+/// of latest block
+pub fn check_repair_batch<T, C, K>(
+	wallet: &mut T,
+	delete_unconfirmed: bool,
+	start_index: u64,
+	batch_size: u64,
+) -> Result<(u64, u64), Error>
+where
+	T: WalletBackend<C, K>,
+	C: NodeClient,
+	K: Keychain,
+{
+	let mut result_vec: Vec<OutputResult> = vec![];
+	let (highest_index, last_retrieved_index, outputs) = wallet
+		.w2n_client()
+		.get_outputs_by_pmmr_index(start_index, batch_size)?;
+
+	result_vec.append(&mut identify_utxo_outputs(wallet, outputs)?);
+
+	check_repair_from_outputs(wallet, delete_unconfirmed, result_vec)?;
+	Ok((highest_index, last_retrieved_index))
 }
 
 fn restore_from_outputs<T, C, K>(wallet: &mut T, outputs: Vec<OutputResult>) -> Result<(), Error>

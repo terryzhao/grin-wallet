@@ -962,7 +962,9 @@ where
 	///
 	/// # Arguments
 	///
-	/// * None
+	/// * `start_index` - the UTXO sets PMMR start index
+	///
+	/// * `batch_size` - batch size of UTXO sets retrieving
 	///
 	/// # Returns
 	/// * `Ok((highest_index, last_retrieved_index))` if successful
@@ -1038,6 +1040,48 @@ where
 		let mut w = self.wallet.lock();
 		w.open_with_credentials()?;
 		let res = owner::check_repair(&mut *w, delete_unconfirmed);
+		w.close()?;
+		res
+	}
+
+	/// Same as `check_repair` except by index on batch
+	///
+	/// # Arguments
+	///
+	/// * `delete_unconfirmed` - same as in `check_repair`
+	///
+	/// * `start_index` - the UTXO sets PMMR start index
+	///
+	/// * `batch_size` - batch size of UTXO sets retrieving
+	///
+	/// # Returns
+	/// * `Ok((highest_index, last_retrieved_index))` if successful
+	/// * or [`libwallet::Error`](../grin_wallet_libwallet/struct.Error.html) if an error is encountered.
+
+	/// # Example
+	/// Set up as in [`new`](struct.Owner.html#method.new) method above.
+	/// ```
+	/// # grin_wallet_api::doctest_helper_setup_doc_env!(wallet, wallet_config);
+	///
+	/// let mut api_owner = Owner::new(wallet.clone());
+	/// let result = api_owner.check_repair_batch(
+	/// 	false, 1, 1000
+	/// );
+	///
+	/// if let Ok((highest_index, last_retrieved_index)) = result {
+	///		// ...
+	/// }
+	/// ```
+
+	pub fn check_repair_batch(
+		&self,
+		delete_unconfirmed: bool,
+		start_index: u64,
+		batch_size: u64,
+	) -> Result<(u64, u64), Error> {
+		let mut w = self.wallet.lock();
+		w.open_with_credentials()?;
+		let res = owner::check_repair_batch(&mut *w, delete_unconfirmed, start_index, batch_size);
 		w.close()?;
 		res
 	}

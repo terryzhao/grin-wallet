@@ -351,6 +351,22 @@ where
 	w.check_repair(delete_unconfirmed)
 }
 
+/// check repair
+pub fn check_repair_batch<T: ?Sized, C, K>(
+	w: &mut T,
+	delete_unconfirmed: bool,
+	start_index: u64,
+	batch_size: u64,
+) -> Result<(u64, u64), Error>
+where
+	T: WalletBackend<C, K>,
+	C: NodeClient,
+	K: Keychain,
+{
+	update_outputs(w, true);
+	w.check_repair_batch(delete_unconfirmed, start_index, batch_size)
+}
+
 /// node height
 pub fn node_height<T: ?Sized, C, K>(w: &mut T) -> Result<NodeHeightResult, Error>
 where
