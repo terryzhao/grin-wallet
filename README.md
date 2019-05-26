@@ -8,7 +8,11 @@
 
 # Grin Wallet
 
-The command line wallet for [Grin](https://github.com/mimblewimble/grin).
+This is the reference implementation of [Grin's](https://github.com/mimblewimble/grin) wallet. It consists of 2 major pieces:
+
+* The Grin Wallet APIs, which are intended for use by Grin community wallet developers. The wallet APIs can be directly linked into other projects or invoked via a JSON-RPC interface.
+
+* A reference command-line wallet, which provides a baseline wallet for Grin and demonstrates how the wallet APIs should be called.
 
 # User Guide
 
@@ -19,5 +23,7 @@ https://github.com/gottstech/grin-wallet/wiki
 https://github.com/gottstech/grin-wallet/wiki
 
 
+# License
 
+Apache License v2.0
 

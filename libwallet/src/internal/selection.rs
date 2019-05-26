@@ -67,6 +67,7 @@ where
 		blinding.secret_key(&keychain.secp()).unwrap(),
 		&parent_key_id,
 		use_test_nonce,
+		0,
 	);
 
 	context.fee = fee;
@@ -168,9 +169,8 @@ where
 }
 
 /// Creates a new output in the wallet for the recipient,
-/// returning the key of the fresh output and a closure
-/// that actually performs the addition of the output to the
-/// wallet
+/// returning the key of the fresh output
+/// Also creates a new transaction containing the output
 pub fn build_recipient_output<T: ?Sized, C, K>(
 	wallet: &mut T,
 	slate: &mut Slate,
@@ -202,6 +202,7 @@ where
 			.unwrap(),
 		&parent_key_id,
 		use_test_rng,
+		1,
 	);
 
 	context.add_output(&key_id, &None, amount);

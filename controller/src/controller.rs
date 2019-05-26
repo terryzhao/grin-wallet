@@ -359,7 +359,7 @@ where
 				send_args: None,
 				..Default::default()
 			};
-			let result = api.initiate_tx(init_args);
+			let result = api.init_send_tx(init_args);
 			let mut slate = match result {
 				Ok(s) => {
 					info!(
@@ -400,7 +400,7 @@ where
 					))?;
 				}
 			}
-			api.tx_lock_outputs(&slate)?;
+			api.tx_lock_outputs(&slate, 0)?;
 			if args.method != "file" {
 				slate = api.finalize_tx(&slate)?;
 			}
@@ -766,7 +766,7 @@ where
 		&self,
 		req: Request<Body>,
 		api: Foreign<T, C, K>,
-	) -> Box<dyn Future<Item = String, Error = Error> + Send> {
+	) -> Box<dyn Future<Item = Slate, Error = Error> + Send> {
 		Box::new(parse_body(req).and_then(
 			//TODO: No way to insert a message from the params
 			move |slate_str: String| {
@@ -776,9 +776,7 @@ where
 					err(e)
 				} else {
 					match api.receive_tx(&slate, None, None) {
-						Ok(s) => ok(s
-							.serialize_to_version(Some(s.version_info.orig_version))
-							.unwrap()),
+						Ok(s) => ok(s),
 						Err(e) => {
 							error!("receive_tx: failed with error: {}", e);
 							err(e)
@@ -805,7 +803,7 @@ where
 			),
 			"receive_tx" => Box::new(
 				self.receive_tx(req, api)
-					.and_then(|res| ok(json_response_slate(&res))),
+					.and_then(|res| ok(json_response(&res))),
 			),
 			_ => Box::new(ok(response(StatusCode::BAD_REQUEST, "unknown action"))),
 		}
@@ -913,29 +911,6 @@ where
 {
 	match serde_json::to_string(s) {
 		Ok(json) => response(StatusCode::OK, json),
-		Err(_) => response(StatusCode::INTERNAL_SERVER_ERROR, ""),
-	}
-}
-
-// As above, dealing with stringified slate output
-// from older versions.
-// Older versions are expecting a slate objects, anything from
-// 1.1.0 up is expecting a string
-fn json_response_slate<T>(s: &T) -> Response<Body>
-where
-	T: Serialize,
-{
-	match serde_json::to_string(s) {
-		Ok(mut json) => {
-			if let None = json.find("version_info") {
-				let mut r = json.clone();
-				r.pop();
-				r.remove(0);
-				// again, for backwards slate compat
-				json = r.replace("\\\"", "\"")
-			}
-			response(StatusCode::OK, json)
-		}
 		Err(_) => response(StatusCode::INTERNAL_SERVER_ERROR, ""),
 	}
 }

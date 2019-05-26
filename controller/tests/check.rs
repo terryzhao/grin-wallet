@@ -187,12 +187,12 @@ fn check_repair_impl(test_dir: &str) -> Result<(), libwallet::Error> {
 			selection_strategy: "all".to_owned(),
 			..Default::default()
 		};
-		let mut slate = api.initiate_tx(args)?;
+		let mut slate = api.init_send_tx(args)?;
 		// output tx file
 		let file_adapter = FileWalletCommAdapter::new();
 		let send_file = format!("{}/part_tx_1.tx", test_dir);
 		file_adapter.send_tx_async(&send_file, &mut slate)?;
-		api.tx_lock_outputs(&slate)?;
+		api.tx_lock_outputs(&slate, 0)?;
 		Ok(())
 	})?;
 
@@ -223,10 +223,9 @@ fn check_repair_impl(test_dir: &str) -> Result<(), libwallet::Error> {
 
 fn two_wallets_one_seed_impl(test_dir: &str) -> Result<(), libwallet::Error> {
 	setup(test_dir);
-	let seed_phrase =
-		"affair pistol cancel crush garment candy ancient flag work \
-		 market crush dry stand focus mutual weapon offer ceiling rival turn team spring \
-		 where swift";
+	let seed_phrase = "affair pistol cancel crush garment candy ancient flag work \
+	                   market crush dry stand focus mutual weapon offer ceiling rival turn team spring \
+	                   where swift";
 
 	// Create a new proxy to simulate server and wallet responses
 	let mut wallet_proxy: WalletProxy<LocalWalletClient, ExtKeychain> = WalletProxy::new(test_dir);

@@ -26,7 +26,10 @@ use crate::internal::{keys, selection, tx, updater};
 use crate::slate::Slate;
 use crate::types::{AcctPathMapping, NodeClient, TxLogEntry, TxWrapper, WalletBackend, WalletInfo};
 use crate::{Error, ErrorKind};
-use crate::{InitTxArgs, NodeHeightResult, OutputCommitMapping, PaymentCommitMapping};
+use crate::{
+	InitTxArgs, IssueInvoiceTxArgs, NodeHeightResult, OutputCommitMapping, PaymentCommitMapping,
+	TxLogEntryType,
+};
 
 const USER_MESSAGE_MAX_LEN: usize = 256;
 
@@ -152,7 +155,7 @@ where
 }
 
 /// Initiate tx as sender
-pub fn initiate_tx<T: ?Sized, C, K>(
+pub fn init_send_tx<T: ?Sized, C, K>(
 	w: &mut T,
 	args: InitTxArgs,
 	use_test_rng: bool,
@@ -210,6 +213,7 @@ where
 		&parent_key_id,
 		0,
 		message,
+		true,
 		use_test_rng,
 	)?;
 
@@ -217,7 +221,7 @@ where
 	// recieve the transaction back
 	{
 		let mut batch = w.batch()?;
-		batch.save_private_context(slate.id.as_bytes(), &context)?;
+		batch.save_private_context(slate.id.as_bytes(), 0, &context)?;
 		batch.commit()?;
 	}
 	if let Some(v) = args.target_slate_version {
@@ -226,14 +230,144 @@ where
 	Ok(slate)
 }
 
-/// Lock sender outputs
-pub fn tx_lock_outputs<T: ?Sized, C, K>(w: &mut T, slate: &Slate) -> Result<(), Error>
+/// Initiate a transaction as the recipient (invoicing)
+pub fn issue_invoice_tx<T: ?Sized, C, K>(
+	w: &mut T,
+	args: IssueInvoiceTxArgs,
+	use_test_rng: bool,
+) -> Result<Slate, Error>
 where
 	T: WalletBackend<C, K>,
 	C: NodeClient,
 	K: Keychain,
 {
-	let context = w.get_private_context(slate.id.as_bytes())?;
+	let parent_key_id = match args.dest_acct_name {
+		Some(d) => {
+			let pm = w.get_acct_path(d)?;
+			match pm {
+				Some(p) => p.path,
+				None => w.parent_key_id(),
+			}
+		}
+		None => w.parent_key_id(),
+	};
+
+	let message = match args.message {
+		Some(mut m) => {
+			m.truncate(USER_MESSAGE_MAX_LEN);
+			Some(m)
+		}
+		None => None,
+	};
+
+	let mut slate = tx::new_tx_slate(&mut *w, args.amount, 2, use_test_rng)?;
+	let context = tx::add_output_to_slate(
+		&mut *w,
+		&mut slate,
+		&parent_key_id,
+		1,
+		message,
+		true,
+		use_test_rng,
+	)?;
+
+	// Save the aggsig context in our DB for when we
+	// recieve the transaction back
+	{
+		let mut batch = w.batch()?;
+		batch.save_private_context(slate.id.as_bytes(), 1, &context)?;
+		batch.commit()?;
+	}
+
+	Ok(slate)
+}
+
+/// Receive an invoice tx, essentially adding inputs to whatever
+/// output was specified
+pub fn process_invoice_tx<T: ?Sized, C, K>(
+	w: &mut T,
+	slate: &Slate,
+	args: InitTxArgs,
+	use_test_rng: bool,
+) -> Result<Slate, Error>
+where
+	T: WalletBackend<C, K>,
+	C: NodeClient,
+	K: Keychain,
+{
+	let mut ret_slate = slate.clone();
+	let parent_key_id = match args.src_acct_name {
+		Some(d) => {
+			let pm = w.get_acct_path(d.to_owned())?;
+			match pm {
+				Some(p) => p.path,
+				None => w.parent_key_id(),
+			}
+		}
+		None => w.parent_key_id(),
+	};
+	// Don't do this multiple times
+	let tx = updater::retrieve_txs(
+		&mut *w,
+		None,
+		Some(ret_slate.id),
+		Some(&parent_key_id),
+		use_test_rng,
+	)?;
+	for t in &tx {
+		if t.tx_type == TxLogEntryType::TxSent {
+			return Err(ErrorKind::TransactionAlreadyReceived(ret_slate.id.to_string()).into());
+		}
+	}
+
+	let message = match args.message {
+		Some(mut m) => {
+			m.truncate(USER_MESSAGE_MAX_LEN);
+			Some(m)
+		}
+		None => None,
+	};
+
+	// update slate current height
+	ret_slate.height = w.w2n_client().get_chain_height()?;
+
+	let context = tx::add_inputs_to_slate(
+		&mut *w,
+		&mut ret_slate,
+		args.minimum_confirmations,
+		args.max_outputs as usize,
+		args.num_change_outputs as usize,
+		args.selection_strategy,
+		&parent_key_id,
+		0,
+		message,
+		false,
+		use_test_rng,
+	)?;
+
+	// Save the aggsig context in our DB for when we
+	// recieve the transaction back
+	{
+		let mut batch = w.batch()?;
+		batch.save_private_context(slate.id.as_bytes(), 0, &context)?;
+		batch.commit()?;
+	}
+
+	Ok(ret_slate)
+}
+
+/// Lock sender outputs
+pub fn tx_lock_outputs<T: ?Sized, C, K>(
+	w: &mut T,
+	slate: &Slate,
+	participant_id: usize,
+) -> Result<(), Error>
+where
+	T: WalletBackend<C, K>,
+	C: NodeClient,
+	K: Keychain,
+{
+	let context = w.get_private_context(slate.id.as_bytes(), participant_id)?;
 	selection::lock_tx_context(&mut *w, slate, &context)
 }
 
@@ -245,13 +379,13 @@ where
 	K: Keychain,
 {
 	let mut sl = slate.clone();
-	let context = w.get_private_context(sl.id.as_bytes())?;
+	let context = w.get_private_context(sl.id.as_bytes(), 0)?;
 	tx::complete_tx(&mut *w, &mut sl, 0, &context)?;
-	tx::update_stored_tx(&mut *w, &mut sl)?;
+	tx::update_stored_tx(&mut *w, &mut sl, false)?;
 	tx::update_message(&mut *w, &mut sl)?;
 	{
 		let mut batch = w.batch()?;
-		batch.delete_private_context(sl.id.as_bytes())?;
+		batch.delete_private_context(sl.id.as_bytes(), 0)?;
 		batch.commit()?;
 	}
 	Ok(sl)

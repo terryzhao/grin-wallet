@@ -25,10 +25,10 @@ use crate::libwallet::api_impl::{foreign, owner};
 use crate::libwallet::{
 	BlockFees, CbData, InitTxArgs, NodeClient, WalletBackend, WalletInfo, WalletInst,
 };
-use crate::lmdb_wallet::LMDBBackend;
 use crate::util;
 use crate::util::secp::pedersen;
 use crate::util::Mutex;
+use crate::LMDBBackend;
 use crate::WalletSeed;
 use chrono::Duration;
 use std::sync::Arc;
@@ -205,9 +205,9 @@ where
 			selection_strategy: "all".to_owned(),
 			..Default::default()
 		};
-		let slate_i = owner::initiate_tx(&mut *w, args, test_mode)?;
+		let slate_i = owner::init_send_tx(&mut *w, args, test_mode)?;
 		let slate = client.send_tx_slate_direct(dest, &slate_i)?;
-		owner::tx_lock_outputs(&mut *w, &slate)?;
+		owner::tx_lock_outputs(&mut *w, &slate, 0)?;
 		let slate = owner::finalize_tx(&mut *w, &slate)?;
 		w.close()?;
 		slate

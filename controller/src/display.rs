@@ -36,6 +36,10 @@ pub fn outputs(
 		account, cur_height
 	);
 	println!();
+	if term::stdout().is_none() {
+		println!("Could not open terminal");
+		return Ok(());
+	}
 	let mut t = term::stdout().unwrap();
 	t.fg(term::color::MAGENTA).unwrap();
 	writeln!(t, "{}", title).unwrap();
@@ -220,6 +224,10 @@ pub fn txs(
 		account, cur_height
 	);
 	println!();
+	if term::stdout().is_none() {
+		println!("Could not open terminal");
+		return Ok(());
+	}
 	let mut t = term::stdout().unwrap();
 	t.fg(term::color::MAGENTA).unwrap();
 	writeln!(t, "{}", title).unwrap();
@@ -498,6 +506,10 @@ pub fn accounts(acct_mappings: Vec<AcctPathMapping>) {
 pub fn tx_messages(tx: &TxLogEntry, dark_background_color_scheme: bool) -> Result<(), Error> {
 	let title = format!("Transaction Messages - Transaction '{}'", tx.id,);
 	println!();
+	if term::stdout().is_none() {
+		println!("Could not open terminal");
+		return Ok(());
+	}
 	let mut t = term::stdout().unwrap();
 	t.fg(term::color::MAGENTA).unwrap();
 	writeln!(t, "{}", title).unwrap();

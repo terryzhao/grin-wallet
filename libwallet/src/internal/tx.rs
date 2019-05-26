@@ -17,14 +17,10 @@
 use uuid::Uuid;
 
 use crate::grin_keychain::{Identifier, Keychain};
-use crate::grin_util::secp::pedersen;
-use crate::grin_util::to_hex;
 use crate::grin_util::Mutex;
 use crate::internal::{selection, updater};
 use crate::slate::Slate;
-use crate::types::{
-	Context, NodeClient, OutputStatus, PaymentCommits, PaymentData, TxLogEntryType, WalletBackend,
-};
+use crate::types::{Context, NodeClient, TxLogEntryType, WalletBackend};
 use crate::{Error, ErrorKind};
 
 /// static for incrementing test UUIDs
@@ -122,6 +118,7 @@ pub fn add_inputs_to_slate<T: ?Sized, C, K>(
 	parent_key_id: &Identifier,
 	participant_id: usize,
 	message: Option<String>,
+	is_initator: bool,
 	use_test_rng: bool,
 ) -> Result<Context, Error>
 where
@@ -162,16 +159,27 @@ where
 		use_test_rng,
 	)?;
 
+	if !is_initator {
+		// perform partial sig
+		let _ = slate.fill_round_2(
+			wallet.keychain(),
+			&context.sec_key,
+			&context.sec_nonce,
+			participant_id,
+		)?;
+	}
+
 	Ok(context)
 }
 
-/// Add outputs to the slate, becoming the recipient
+/// Add receiver output to the slate
 pub fn add_output_to_slate<T: ?Sized, C, K>(
 	wallet: &mut T,
 	slate: &mut Slate,
 	parent_key_id: &Identifier,
 	participant_id: usize,
 	message: Option<String>,
+	is_initiator: bool,
 	use_test_rng: bool,
 ) -> Result<Context, Error>
 where
@@ -193,18 +201,20 @@ where
 		use_test_rng,
 	)?;
 
-	// perform partial sig
-	let _ = slate.fill_round_2(
-		wallet.keychain(),
-		&context.sec_key,
-		&context.sec_nonce,
-		participant_id,
-	)?;
+	if !is_initiator {
+		// perform partial sig
+		let _ = slate.fill_round_2(
+			wallet.keychain(),
+			&context.sec_key,
+			&context.sec_nonce,
+			participant_id,
+		)?;
+	}
 
 	Ok(context)
 }
 
-/// Complete a transaction as the sender
+/// Complete a transaction
 pub fn complete_tx<T: ?Sized, C, K>(
 	wallet: &mut T,
 	slate: &mut Slate,
@@ -222,65 +232,9 @@ where
 		&context.sec_nonce,
 		participant_id,
 	)?;
+
 	// Final transaction can be built by anyone at this stage
 	slate.finalize(wallet.keychain())?;
-
-	let parent_key_id = Some(&context.parent_key_id);
-
-	// Get the change output/s from database
-	let changes = updater::retrieve_outputs(wallet, false, None, Some(slate.id), parent_key_id)?;
-	let change_commits = changes
-		.iter()
-		.map(|oc| oc.commit.clone())
-		.collect::<Vec<pedersen::Commitment>>();
-
-	// Find the payment output/s
-	let mut outputs: Vec<pedersen::Commitment> = Vec::new();
-	for output in slate.tx.outputs() {
-		if !change_commits.contains(&output.commit) {
-			outputs.insert(0, output.commit.clone());
-		}
-	}
-
-	// sender save the payment output
-	let mut batch = wallet.batch()?;
-	batch.save_payment_commits(
-		&slate.id,
-		PaymentCommits {
-			commits: outputs
-				.iter()
-				.map(|c| to_hex(c.as_ref().to_vec()))
-				.collect::<Vec<String>>(),
-			slate_id: slate.id,
-		},
-	)?;
-	// todo: multiple receivers transaction
-	if outputs.len() > 1 {
-		for output in outputs {
-			let payment_output = to_hex(output.clone().as_ref().to_vec());
-			batch.save_payment(PaymentData {
-				commit: payment_output,
-				value: 0, // '0' means unknown here, since '0' value is impossible for an output.
-				status: OutputStatus::Unconfirmed,
-				height: slate.height,
-				lock_height: 0,
-				slate_id: slate.id,
-			})?;
-		}
-	} else if outputs.len() == 1 {
-		let payment_output = to_hex(outputs.first().clone().unwrap().as_ref().to_vec());
-		batch.save_payment(PaymentData {
-			commit: payment_output,
-			value: slate.amount,
-			status: OutputStatus::Unconfirmed,
-			height: slate.height,
-			lock_height: 0,
-			slate_id: slate.id,
-		})?;
-	} else {
-		warn!("complete_tx - no 'payment' output! is this a sending to self for test purpose?");
-	}
-	batch.commit()?;
 	Ok(())
 }
 
@@ -321,7 +275,11 @@ where
 }
 
 /// Update the stored transaction (this update needs to happen when the TX is finalised)
-pub fn update_stored_tx<T: ?Sized, C, K>(wallet: &mut T, slate: &Slate) -> Result<(), Error>
+pub fn update_stored_tx<T: ?Sized, C, K>(
+	wallet: &mut T,
+	slate: &Slate,
+	is_invoiced: bool,
+) -> Result<(), Error>
 where
 	T: WalletBackend<C, K>,
 	C: NodeClient,
@@ -332,7 +290,11 @@ where
 	let mut tx = None;
 	// don't want to assume this is the right tx, in case of self-sending
 	for t in tx_vec {
-		if t.tx_type == TxLogEntryType::TxSent {
+		if t.tx_type == TxLogEntryType::TxSent && !is_invoiced {
+			tx = Some(t.clone());
+			break;
+		}
+		if t.tx_type == TxLogEntryType::TxReceived && is_invoiced {
 			tx = Some(t.clone());
 			break;
 		}
