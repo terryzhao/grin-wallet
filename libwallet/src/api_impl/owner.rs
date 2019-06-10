@@ -279,6 +279,10 @@ where
 		batch.commit()?;
 	}
 
+	if let Some(v) = args.target_slate_version {
+		slate.version_info.orig_version = v;
+	}
+
 	Ok(slate)
 }
 
@@ -351,6 +355,10 @@ where
 		let mut batch = w.batch()?;
 		batch.save_private_context(slate.id.as_bytes(), 0, &context)?;
 		batch.commit()?;
+	}
+
+	if let Some(v) = args.target_slate_version {
+		ret_slate.version_info.orig_version = v;
 	}
 
 	Ok(ret_slate)

@@ -29,8 +29,11 @@ pub mod v2;
 /// The most recent version of the slate
 pub const CURRENT_SLATE_VERSION: u16 = 2;
 
+/// The grin block header this slate is intended to be compatible with
+pub const GRIN_BLOCK_HEADER_VERSION: u16 = 1;
+
 /// Existing versions of the slate
-#[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(EnumIter, Serialize, Deserialize, Clone, Debug, PartialEq, PartialOrd, Eq, Ord)]
 pub enum SlateVersion {
 	/// V0
 	V0,

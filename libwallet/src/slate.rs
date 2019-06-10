@@ -45,7 +45,7 @@ use crate::slate_versions::v2::{
 	InputV2, OutputV2, ParticipantDataV2, SlateV2, TransactionBodyV2, TransactionV2, TxKernelV2,
 	VersionCompatInfoV2,
 };
-use crate::slate_versions::CURRENT_SLATE_VERSION;
+use crate::slate_versions::{CURRENT_SLATE_VERSION, GRIN_BLOCK_HEADER_VERSION};
 
 /// Public data for each participant in the slate
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -185,8 +185,8 @@ pub struct VersionCompatInfo {
 	pub version: u16,
 	/// Original version this slate was converted from
 	pub orig_version: u16,
-	/// Minimum version this slate is compatible with
-	pub min_compat_version: u16,
+	/// The grin block header version this slate is intended for
+	pub block_header_version: u16,
 }
 
 /// Helper just to facilitate serialization
@@ -240,7 +240,7 @@ impl Slate {
 			version_info: VersionCompatInfo {
 				version: CURRENT_SLATE_VERSION,
 				orig_version: CURRENT_SLATE_VERSION,
-				min_compat_version: 0,
+				block_header_version: GRIN_BLOCK_HEADER_VERSION,
 			},
 		}
 	}
@@ -483,7 +483,7 @@ impl Slate {
 		let blind_offset = keychain.blind_sum(
 			&BlindSum::new()
 				.add_blinding_factor(BlindingFactor::from_secret_key(sec_key.clone()))
-				.sub_blinding_factor(self.tx.offset),
+				.sub_blinding_factor(self.tx.offset.clone()),
 		)?;
 		*sec_key = blind_offset.secret_key(&keychain.secp())?;
 		Ok(())
@@ -631,7 +631,7 @@ impl Slate {
 	where
 		K: Keychain,
 	{
-		let kernel_offset = self.tx.offset;
+		let kernel_offset = &self.tx.offset;
 
 		self.check_fees()?;
 
@@ -820,15 +820,15 @@ impl From<&VersionCompatInfo> for VersionCompatInfoV2 {
 		let VersionCompatInfo {
 			version,
 			orig_version,
-			min_compat_version,
+			block_header_version,
 		} = data;
 		let version = *version;
 		let orig_version = *orig_version;
-		let min_compat_version = *min_compat_version;
+		let block_header_version = *block_header_version;
 		VersionCompatInfoV2 {
 			version,
 			orig_version,
-			min_compat_version,
+			block_header_version,
 		}
 	}
 }
@@ -844,7 +844,7 @@ impl From<Transaction> for TransactionV2 {
 impl From<&Transaction> for TransactionV2 {
 	fn from(tx: &Transaction) -> TransactionV2 {
 		let Transaction { offset, body } = tx;
-		let offset = *offset;
+		let offset = offset.clone();
 		let body = TransactionBodyV2::from(body);
 		TransactionV2 { offset, body }
 	}
@@ -973,15 +973,15 @@ impl From<&VersionCompatInfoV2> for VersionCompatInfo {
 		let VersionCompatInfoV2 {
 			version,
 			orig_version,
-			min_compat_version,
+			block_header_version,
 		} = data;
 		let version = *version;
 		let orig_version = *orig_version;
-		let min_compat_version = *min_compat_version;
+		let block_header_version = *block_header_version;
 		VersionCompatInfo {
 			version,
 			orig_version,
-			min_compat_version,
+			block_header_version,
 		}
 	}
 }
