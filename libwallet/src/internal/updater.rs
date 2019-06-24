@@ -393,6 +393,8 @@ where
 	Ok(())
 }
 
+/// Only for miner wallet.
+/// Clean the unconfirmed coinbase output which was created at 50 minutes ago.
 fn clean_old_unconfirmed<T: ?Sized, C, K>(wallet: &mut T, height: u64) -> Result<(), Error>
 where
 	T: WalletBackend<C, K>,
@@ -412,11 +414,14 @@ where
 			ids_to_del.push(out.key_id.clone())
 		}
 	}
-	let mut batch = wallet.batch()?;
-	for id in ids_to_del {
-		batch.delete(&id, &None)?;
+
+	if ids_to_del.len() > 0 {
+		let mut batch = wallet.batch()?;
+		for id in ids_to_del {
+			batch.delete(&id, &None)?;
+		}
+		batch.commit()?;
 	}
-	batch.commit()?;
 	Ok(())
 }
 

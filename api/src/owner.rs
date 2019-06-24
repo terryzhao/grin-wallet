@@ -1159,6 +1159,11 @@ where
 	///
 	/// * `batch_size` - batch size of UTXO sets retrieving
 	///
+	/// * `is_update_outputs` - if `false`, the check_repair_batch process will skip the update_outputs.
+	/// This is useful to speed up this check_repair_batch function, because it only make sense to call
+	/// one time of update_outputs() in a whole check_repair_batch procedure. Only set this parameter
+	/// as `true` in the 1st call of this function in a check_repair_batch procedure.
+	///
 	/// # Returns
 	/// * `Ok((highest_index, last_retrieved_index))` if successful
 	/// * or [`libwallet::Error`](../grin_wallet_libwallet/struct.Error.html) if an error is encountered.
@@ -1170,7 +1175,7 @@ where
 	///
 	/// let mut api_owner = Owner::new(wallet.clone());
 	/// let result = api_owner.check_repair_batch(
-	/// 	false, 1, 1000
+	/// 	false, 1, 1000, true
 	/// );
 	///
 	/// if let Ok((highest_index, last_retrieved_index)) = result {
@@ -1183,10 +1188,17 @@ where
 		delete_unconfirmed: bool,
 		start_index: u64,
 		batch_size: u64,
+		is_update_outputs: bool,
 	) -> Result<(u64, u64), Error> {
 		let mut w = self.wallet.lock();
 		w.open_with_credentials()?;
-		let res = owner::check_repair_batch(&mut *w, delete_unconfirmed, start_index, batch_size);
+		let res = owner::check_repair_batch(
+			&mut *w,
+			delete_unconfirmed,
+			start_index,
+			batch_size,
+			is_update_outputs,
+		);
 		w.close()?;
 		res
 	}

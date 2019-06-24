@@ -499,13 +499,16 @@ pub fn check_repair_batch<T: ?Sized, C, K>(
 	delete_unconfirmed: bool,
 	start_index: u64,
 	batch_size: u64,
+	is_update_outputs: bool,
 ) -> Result<(u64, u64), Error>
 where
 	T: WalletBackend<C, K>,
 	C: NodeClient,
 	K: Keychain,
 {
-	update_outputs(w, true);
+	if is_update_outputs {
+		update_outputs(w, true);
+	}
 	w.check_repair_batch(delete_unconfirmed, start_index, batch_size)
 }
 

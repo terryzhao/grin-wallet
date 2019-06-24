@@ -424,6 +424,12 @@ where
 
 	result_vec.append(&mut identify_utxo_outputs(wallet, outputs)?);
 
+	// 'delete_unconfirmed' only make sense at the last call of this batch repair
+	let mut delete_unconfirmed = delete_unconfirmed;
+	if delete_unconfirmed && last_retrieved_index < highest_index {
+		delete_unconfirmed = false;
+	}
+
 	check_repair_from_outputs(wallet, delete_unconfirmed, result_vec)?;
 	Ok((highest_index, last_retrieved_index))
 }
