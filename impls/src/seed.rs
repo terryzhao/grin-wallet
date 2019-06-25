@@ -179,6 +179,7 @@ impl WalletSeed {
 		seed_length: usize,
 		recovery_phrase: Option<util::ZeroingString>,
 		password: &str,
+		remind_phrase_backup: bool,
 	) -> Result<WalletSeed, Error> {
 		// create directory if it doesn't exist
 		fs::create_dir_all(&wallet_config.data_file_dir).context(ErrorKind::IO)?;
@@ -201,7 +202,9 @@ impl WalletSeed {
 		let mut file = File::create(seed_file_path).context(ErrorKind::IO)?;
 		file.write_all(&enc_seed_json.as_bytes())
 			.context(ErrorKind::IO)?;
-		seed.show_recovery_phrase()?;
+		if remind_phrase_backup {
+			seed.show_recovery_phrase()?;
+		}
 		Ok(seed)
 	}
 
