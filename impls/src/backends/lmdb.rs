@@ -385,7 +385,11 @@ where
 		Ok(())
 	}
 
-	fn restore_batch(&mut self, start_index: u64, batch_size: u64) -> Result<(u64, u64), Error> {
+	fn restore_batch(
+		&mut self,
+		start_index: u64,
+		batch_size: u64,
+	) -> Result<(u64, u64, u64), Error> {
 		let res = restore_batch(self, start_index, batch_size).context(ErrorKind::Restore)?;
 		Ok(res)
 	}

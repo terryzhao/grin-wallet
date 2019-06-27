@@ -1083,11 +1083,15 @@ where
 	/// let mut api_owner = Owner::new(wallet.clone());
 	/// let result = api_owner.restore_batch(1, 1000);
 	///
-	/// if let Ok((highest_index, last_retrieved_index)) = result {
+	/// if let Ok((highest_index, last_retrieved_index, num_of_found)) = result {
 	///		// ...
 	/// }
 	/// ```
-	pub fn restore_batch(&self, start_index: u64, batch_size: u64) -> Result<(u64, u64), Error> {
+	pub fn restore_batch(
+		&self,
+		start_index: u64,
+		batch_size: u64,
+	) -> Result<(u64, u64, u64), Error> {
 		let mut w = self.wallet.lock();
 		w.open_with_credentials()?;
 		let res = owner::restore_batch(&mut *w, start_index, batch_size);

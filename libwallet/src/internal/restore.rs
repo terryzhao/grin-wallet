@@ -552,7 +552,7 @@ pub fn restore_batch<T, C, K>(
 	wallet: &mut T,
 	start_index: u64,
 	batch_size: u64,
-) -> Result<(u64, u64), Error>
+) -> Result<(u64, u64, u64), Error>
 where
 	T: WalletBackend<C, K>,
 	C: NodeClient,
@@ -565,6 +565,7 @@ where
 
 	result_vec.append(&mut identify_utxo_outputs(wallet, outputs.clone())?);
 
+	let num_of_found = result_vec.len();
 	restore_from_outputs(wallet, result_vec)?;
-	Ok((highest_index, last_retrieved_index))
+	Ok((highest_index, last_retrieved_index, num_of_found as u64))
 }

@@ -473,7 +473,7 @@ pub fn restore_batch<T: ?Sized, C, K>(
 	w: &mut T,
 	start_index: u64,
 	batch_size: u64,
-) -> Result<(u64, u64), Error>
+) -> Result<(u64, u64, u64), Error>
 where
 	T: WalletBackend<C, K>,
 	C: NodeClient,
