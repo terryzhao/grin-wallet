@@ -202,7 +202,7 @@ impl Slate {
 		Ok(probe.version())
 	}
 
-	/// Recieve a slate, upgrade it to the latest version internally
+	/// Receive a slate, upgrade it to the latest version internally
 	pub fn deserialize_upgrade(slate_json: &str) -> Result<Slate, Error> {
 		let version = Slate::parse_slate_version(slate_json)?;
 		let v2: SlateV2 = match version {

@@ -22,6 +22,7 @@ use blake2_rfc as blake2;
 extern crate serde_derive;
 #[macro_use]
 extern crate log;
+use crate::core::global;
 use grin_wallet_libwallet as libwallet;
 use grin_wallet_util::grin_api as api;
 use grin_wallet_util::grin_chain as chain;
@@ -59,6 +60,12 @@ pub fn instantiate_wallet(
 	passphrase: &str,
 	account: &str,
 ) -> Result<Arc<Mutex<WalletInst<impl NodeClient, keychain::ExtKeychain>>>, Error> {
+	// Set Chain Type
+	let chain_type = wallet_config.chain_type.clone();
+	if let Some(chain_type) = chain_type {
+		global::set_mining_mode(chain_type);
+	}
+
 	// First test decryption, so we can abort early if we have the wrong password
 	let _ = WalletSeed::from_file(&wallet_config, passphrase)?;
 	let mut db_wallet = LMDBBackend::new(wallet_config.clone(), passphrase, node_client)?;
