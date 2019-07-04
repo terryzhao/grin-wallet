@@ -218,7 +218,7 @@ where
 	)?;
 
 	// Save the aggsig context in our DB for when we
-	// recieve the transaction back
+	// receive the transaction back
 	{
 		let mut batch = w.batch()?;
 		batch.save_private_context(slate.id.as_bytes(), 0, &context)?;
