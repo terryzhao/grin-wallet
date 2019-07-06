@@ -125,7 +125,7 @@ mod wallet_tests {
 	{
 		wallet_config.chain_type = None;
 		// First test decryption, so we can abort early if we have the wrong password
-		let _ = WalletSeed::from_file(&wallet_config, passphrase)?;
+		let _ = WalletSeed::from_file(wallet_config.data_file_dir.as_str(), passphrase)?;
 		let mut db_wallet = LMDBBackend::new(wallet_config.clone(), passphrase, node_client)?;
 		db_wallet.set_parent_key_id_by_name(account)?;
 		info!("Using LMDB Backend for wallet");

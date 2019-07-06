@@ -365,3 +365,5 @@ subcommands:
             short: d
             long: delete_unconfirmed
             takes_value: false
+  - passwd:
+      about: Changing password for wallet.

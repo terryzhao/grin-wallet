@@ -169,8 +169,9 @@ where
 {
 	/// Initialise with whatever stored credentials we have
 	fn open_with_credentials(&mut self) -> Result<(), Error> {
-		let wallet_seed = WalletSeed::from_file(&self.config, &self.passphrase)
-			.context(ErrorKind::CallbackImpl("Error opening wallet"))?;
+		let wallet_seed =
+			WalletSeed::from_file(&self.config.data_file_dir.as_str(), &self.passphrase)
+				.context(ErrorKind::CallbackImpl("Error opening wallet"))?;
 		self.keychain = Some(
 			wallet_seed
 				.derive_keychain(global::is_floonet())
@@ -193,6 +194,16 @@ where
 	/// Return the node client being used
 	fn w2n_client(&mut self) -> &mut C {
 		&mut self.w2n_client
+	}
+
+	/// Return the wallet data file dir
+	fn wallet_data_dir(&self) -> &str {
+		self.config.data_file_dir.as_str()
+	}
+
+	/// Update passphrase
+	fn update_passphrase(&mut self, new_password: &str) {
+		self.passphrase = ZeroingString::from(new_password);
 	}
 
 	/// return the version of the commit for caching

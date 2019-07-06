@@ -14,14 +14,14 @@
 
 //! Owner API External Definition
 
-use crate::util::Mutex;
+use crate::util::{Mutex, ZeroingString};
 use chrono::prelude::*;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::core::core::Transaction;
-use crate::impls::{HTTPWalletCommAdapter, KeybaseWalletCommAdapter};
+use crate::impls::{HTTPWalletCommAdapter, KeybaseWalletCommAdapter, WalletSeed};
 use crate::keychain::{Identifier, Keychain};
 use crate::libwallet::api_impl::owner;
 use crate::libwallet::{
@@ -1232,6 +1232,7 @@ where
 	/// ```
 	/// # grin_wallet_api::doctest_helper_setup_doc_env!(wallet, wallet_config);
 	///
+	///
 	/// let api_owner = Owner::new(wallet.clone());
 	/// let result = api_owner.node_height();
 	///
@@ -1250,6 +1251,65 @@ where
 		let res = owner::node_height(&mut *w);
 		w.close()?;
 		res
+	}
+
+	/// Change password. This is determined as follows:
+	///
+	/// # Arguments
+	///
+	/// * `old_password` - the old password
+	///
+	/// * `new_password` - the new password
+	///
+	/// # Returns
+	///
+	/// * `Ok(())` if successful
+	/// * or [`libwallet::Error`](../grin_wallet_libwallet/struct.Error.html) if an error is encountered.
+	///
+	/// # Example
+	/// Set up as in [`new`](struct.Owner.html#method.new) method above.
+	/// ```
+	/// # grin_wallet_api::doctest_helper_setup_doc_env!(wallet, wallet_config);
+	///
+	/// let api_owner = Owner::new(wallet.clone());
+	/// let oldpass = Some(ZeroingString::from("password"));
+	/// let result = api_owner.change_password(&oldpass, "password");
+	/// if let Ok(_) = result {
+	///		//password has been changed successfully
+	/// }
+	/// ```
+	pub fn change_password(
+		&self,
+		old_password: &Option<ZeroingString>,
+		new_password: &str,
+	) -> Result<(), Error> {
+		if old_password.is_none() {
+			return Err(ErrorKind::GenericError(
+				"change_password failed for empty old password".to_owned(),
+			)
+			.into());
+		}
+
+		let mut w = self.wallet.lock();
+		w.open_with_credentials()?;
+
+		//TODO: move these out of 'grin_wallet_api' crate, since it's not an owner_api.
+		// Move to 'grin_wallet_libwallet' crate for example.
+		{
+			let data_file_dir = w.wallet_data_dir();
+			let wallet_seed =
+				WalletSeed::update(data_file_dir, &old_password.clone().unwrap(), new_password);
+			if let Err(e) = wallet_seed {
+				return Err(
+					ErrorKind::GenericError(format!("wallet seed update fail for {}", e)).into(),
+				);
+			}
+
+			w.update_passphrase(new_password);
+		}
+
+		w.close()?;
+		Ok(())
 	}
 }
 
@@ -1274,6 +1334,7 @@ macro_rules! doctest_helper_setup_doc_env {
 		use config::WalletConfig;
 		use impls::{HTTPNodeClient, LMDBBackend, WalletSeed};
 		use libwallet::{InitTxArgs, IssueInvoiceTxArgs, Slate, WalletBackend};
+		use util::ZeroingString;
 
 		let dir = tempdir().map_err(|e| format!("{:#?}", e)).unwrap();
 		let dir = dir

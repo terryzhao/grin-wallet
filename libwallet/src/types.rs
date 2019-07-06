@@ -68,6 +68,12 @@ where
 	/// Return the client being used to communicate with the node
 	fn w2n_client(&mut self) -> &mut C;
 
+	/// Return the wallet data file dir
+	fn wallet_data_dir(&self) -> &str;
+
+	/// Update passphrase
+	fn update_passphrase(&mut self, new_password: &str);
+
 	/// return the commit for caching if allowed, none otherwise
 	fn calc_commit_for_cache(
 		&mut self,

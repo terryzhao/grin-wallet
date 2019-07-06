@@ -63,7 +63,7 @@ pub struct InitArgs {
 
 pub fn init(g_args: &GlobalArgs, args: InitArgs) -> Result<(), Error> {
 	WalletSeed::init_file(
-		&args.config,
+		args.config.data_file_dir.as_str(),
 		args.list_length,
 		args.recovery_phrase,
 		&args.password,
@@ -86,15 +86,9 @@ pub struct RecoverArgs {
 	pub passphrase: ZeroingString,
 }
 
-/// Check whether seed file exists
-pub fn wallet_seed_exists(config: &WalletConfig) -> Result<(), Error> {
-	let res = WalletSeed::seed_file_exists(&config)?;
-	Ok(res)
-}
-
 pub fn recover(config: &WalletConfig, args: RecoverArgs) -> Result<(), Error> {
 	if args.recovery_phrase.is_none() {
-		let res = WalletSeed::from_file(config, &args.passphrase);
+		let res = WalletSeed::from_file(config.data_file_dir.as_str(), &args.passphrase);
 		if let Err(e) = res {
 			error!("Error loading wallet seed (check password): {}", e);
 			return Err(e.into());
@@ -102,7 +96,7 @@ pub fn recover(config: &WalletConfig, args: RecoverArgs) -> Result<(), Error> {
 		let _ = res.unwrap().show_recovery_phrase();
 	} else {
 		let res = WalletSeed::recover_from_phrase(
-			&config,
+			config.data_file_dir.as_str(),
 			&args.recovery_phrase.as_ref().unwrap(),
 			&args.passphrase,
 		);
@@ -879,6 +873,32 @@ pub fn check_repair(
 			Err(e) => {
 				error!("Wallet check failed: {}", e);
 				error!("Backtrace: {}", e.backtrace().unwrap());
+				Err(e)
+			}
+		}
+	})?;
+	Ok(())
+}
+
+/// wallet check
+pub struct PwdUpdateArgs {
+	pub new_password: ZeroingString,
+}
+
+pub fn change_password(
+	wallet: Arc<Mutex<WalletInst<impl NodeClient + 'static, keychain::ExtKeychain>>>,
+	g_args: &GlobalArgs,
+	args: PwdUpdateArgs,
+) -> Result<(), Error> {
+	controller::owner_single_use(wallet.clone(), |api| {
+		let result = api.change_password(&g_args.password, &args.new_password);
+		match result {
+			Ok(_) => {
+				warn!("Your password has been changed successfully!",);
+				Ok(())
+			}
+			Err(e) => {
+				error!("Password change failed: {}", e);
 				Err(e)
 			}
 		}

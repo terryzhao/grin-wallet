@@ -30,6 +30,7 @@ use grin_wallet_util::grin_keychain as keychain;
 use linefeed::terminal::Signal;
 use linefeed::{Interface, ReadResult};
 use rpassword;
+use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -87,6 +88,18 @@ fn prompt_password_confirm() -> ZeroingString {
 	while first != second {
 		first = prompt_password_stdout("Password: ");
 		second = prompt_password_stdout("Confirm Password: ");
+
+		if first != second {
+			let mut stdout = std::io::stdout();
+
+			write!(
+				stdout,
+				"{}",
+				"Password and confirm password doesn't match. Please try again.\n"
+			)
+			.unwrap();
+			stdout.flush().unwrap();
+		}
 	}
 	first
 }
@@ -214,8 +227,12 @@ pub fn inst_wallet(
 	g_args: &command::GlobalArgs,
 	node_client: impl NodeClient + 'static,
 ) -> Result<Arc<Mutex<WalletInst<impl NodeClient + 'static, keychain::ExtKeychain>>>, ParseError> {
-	let passphrase = prompt_password(&g_args.password);
-	let res = instantiate_wallet(config.clone(), node_client, &passphrase, &g_args.account);
+	let res = instantiate_wallet(
+		config.clone(),
+		node_client,
+		&g_args.password.clone().unwrap(),
+		&g_args.account,
+	);
 	match res {
 		Ok(p) => Ok(p),
 		Err(e) => {
@@ -364,7 +381,7 @@ pub fn parse_init_args(
 	g_args: &command::GlobalArgs,
 	args: &ArgMatches,
 ) -> Result<command::InitArgs, ParseError> {
-	if let Err(e) = WalletSeed::seed_file_exists(config) {
+	if let Err(e) = WalletSeed::seed_file_exists(config.data_file_dir.as_str()) {
 		let msg = format!("Not creating wallet - {}", e.inner);
 		return Err(ParseError::ArgumentError(msg));
 	}
@@ -407,10 +424,9 @@ pub fn parse_recover_args(
 			true => (prompt_password(&g_args.password), None),
 			false => {
 				let cont = {
-					if command::wallet_seed_exists(config).is_err() {
-						prompt_replace_seed()?
-					} else {
-						true
+					match WalletSeed::seed_file_exists(config.data_file_dir.as_str()) {
+						Err(_) => prompt_replace_seed()?,
+						Ok(_) => true,
 					}
 				};
 				if !cont {
@@ -423,8 +439,8 @@ pub fn parse_recover_args(
 		}
 	};
 	Ok(command::RecoverArgs {
-		passphrase: passphrase,
-		recovery_phrase: recovery_phrase,
+		passphrase,
+		recovery_phrase,
 	})
 }
 
@@ -729,6 +745,21 @@ pub fn parse_check_args(args: &ArgMatches) -> Result<command::CheckArgs, ParseEr
 	})
 }
 
+pub fn parse_pwdupdate_args(_args: &ArgMatches) -> Result<command::PwdUpdateArgs, ParseError> {
+	let mut stdout = std::io::stdout();
+	write!(
+		stdout,
+		"{}",
+		"Changing password for wallet. Please Input your new password.\n"
+	)?;
+
+	let passphrase = prompt_password_confirm();
+
+	Ok(command::PwdUpdateArgs {
+		new_password: passphrase,
+	})
+}
+
 pub fn parse_outputs_args(args: &ArgMatches) -> Result<command::OutputsArgs, ParseError> {
 	let minvalue = match args.value_of("minvalue") {
 		None => None,
@@ -861,10 +892,15 @@ pub fn wallet_command(
 		wallet_config.check_node_api_http_addr = sa.to_string().clone();
 	}
 
-	let global_wallet_args = arg_parse!(parse_global_args(&wallet_config, &wallet_args));
+	let mut global_wallet_args = arg_parse!(parse_global_args(&wallet_config, &wallet_args));
 
 	node_client.set_node_url(&wallet_config.check_node_api_http_addr);
 	node_client.set_node_api_secret(global_wallet_args.node_api_secret.clone());
+
+	// prompt to input password
+	if global_wallet_args.password.is_none() {
+		global_wallet_args.password = Some(prompt_password(&global_wallet_args.password));
+	}
 
 	// closure to instantiate wallet as needed by each subcommand
 	let inst_wallet = || {
@@ -980,6 +1016,12 @@ pub fn wallet_command(
 		("check", Some(args)) => {
 			let a = arg_parse!(parse_check_args(&args));
 			command::check_repair(inst_wallet(), a)
+		}
+		("passwd", Some(args)) => {
+			let wallet = inst_wallet();
+
+			let a = arg_parse!(parse_pwdupdate_args(&args));
+			command::change_password(wallet, &global_wallet_args, a)
 		}
 		_ => {
 			let msg = format!("Unknown wallet command, use 'grin help wallet' for details");
