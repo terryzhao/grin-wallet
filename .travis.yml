@@ -47,7 +47,7 @@ cache:
 env:
   global:
     - RUST_BACKTRACE="1"
-    - RUST_FLAGS="-C debug-assertions"
+    - RUSTFLAGS="-C debug-assertions"
 
 matrix:
   include:
@@ -57,28 +57,21 @@ matrix:
       env: CI_JOB="test"        CI_JOB_ARGS="impls"
     - os: linux
       env: CI_JOB="test"        CI_JOB_ARGS="controller ."
-    - os: linux
-      env: CI_JOB="release"     CI_JOB_ARGS=
     - os: osx
-      env: CI_JOB="release"     CI_JOB_ARGS=
-#    - os: windows
-#      env: CI_JOB="release"     CI_JOB_ARGS=
+      env: CI_JOB="test"        CI_JOB_ARGS="config libwallet api"
+    - os: osx
+      env: CI_JOB="test"        CI_JOB_ARGS="impls"
+    - os: osx
+      env: CI_JOB="test"        CI_JOB_ARGS="controller ."
+    - os: windows
+      env: CI_JOB="test"        CI_JOB_ARGS="config libwallet api"
+    - os: windows
+      env: CI_JOB="test"        CI_JOB_ARGS="impls"
+    - os: windows
+      env: CI_JOB="test"        CI_JOB_ARGS="controller ."
 
 script: .ci/general-jobs
 
 before_cache:
   - rm -rf $TRAVIS_BUILD_DIR/target/tmp
 
-before_deploy:
-  - bash .ci/release-jobs
-
-deploy:
-  provider: releases
-  api_key:
-    secure: G2OxRSOSGAYq1mcQTYKliOiUaT8mGLp/ZFPTAjL7ByWa0OVxdlK+WEhzN7FrStdbcb1q8DNi/Mie9b2CurVjFGyqeGSCboTdYT77TDT1Wvxp9fPLG4xbgTRwAChq8o7TxOAqeC2J56HXz2Ed2529omJmn4ems6vqI9cHQ+NfpBfh6CKbPXRD7t6Ul6FygAuggYLJE5/e4ws6pRAaD0pFn3vhSab4Ka3L4LFcxffFzH2xt2fEzoA0/NjRxgD/w8wmq6om61+Jir6Zx41HH04R7zLSn7eWVxrw15o5CD4EPqhCRwYUf1kHAabaLiRcmIz9l7jtpcgzFo68A89bFROZ/GyTHazjjobLMSvo1zZnXPGyjx1MiIfOGLBo0842BuvGCEUD2ACiDoZge0+J7mzkdIVSKVx3y2sR3S7W6z4w0YZaS9pjyukhRfIYITomPUhFcJ6xTj1EsYyEAxr+Ohg5nDZgBpy9yjOmJyBKoQgdk8IMadbBO3dhCjkrw7HO4kdtwayEo/W87UH5b2thxbTsd7EWorMh+aCyzcRdRlNBUXI4pWTaP7vZPZGaBAzRYk4ETbUgxpFVxFFNlyie2TzSPz0/j/0JcG1IZxIh9eAI89ebGVKpVgFm6TQvb58J502g3dHwoGxL8lBQTc7DUQAAVBaNEnM5floFw04igQb6VQs=
-  file_glob: true
-  file: target/release/grin-wallet-*.*
-  skip_cleanup: true
-  on:
-    repo: mimblewimble/grin-wallet
-    tags: true
