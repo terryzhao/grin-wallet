@@ -68,7 +68,9 @@ matrix:
     - os: windows
       env: CI_JOB="test"        CI_JOB_ARGS="impls"
     - os: windows
-      env: CI_JOB="test"        CI_JOB_ARGS="controller ."
+      env: CI_JOB="test"        CI_JOB_ARGS="controller"
+    - os: windows
+      env: CI_JOB="test"        CI_JOB_ARGS="."
 
 script: .ci/general-jobs
 
