@@ -28,6 +28,7 @@ use grin_wallet_api as apiwallet;
 use grin_wallet_config as config;
 use grin_wallet_impls as impls;
 use grin_wallet_libwallet as libwallet;
+use grin_wallet_relay as grinrelay;
 use grin_wallet_util::grin_api as api;
 use grin_wallet_util::grin_core as core;
 use grin_wallet_util::grin_keychain as keychain;

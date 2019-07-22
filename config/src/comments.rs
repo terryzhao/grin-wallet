@@ -124,6 +124,44 @@ fn comments() -> HashMap<String, String> {
 	);
 
 	retval.insert(
+		"[wallet.grinrelay_config]".to_string(),
+		"
+#########################################
+###        Grin Relay Config          ###
+#########################################
+"
+		.to_string(),
+	);
+	retval.insert(
+		"grinrelay_domain".to_string(),
+		"
+#The Grin transaction relay service provider domain.
+"
+		.to_string(),
+	);
+	retval.insert(
+		"grinrelay_port".to_string(),
+		"
+#The Grin transaction relay server port.
+"
+		.to_string(),
+	);
+	retval.insert(
+		"grinrelay_protocol_unsecure".to_string(),
+		"
+#Use ws or wss on grin relay service. Note: ws is not secure.
+"
+		.to_string(),
+	);
+	retval.insert(
+		"grinrelay_address_index".to_string(),
+		"
+#Which Grin Relay address to use. Choose any value within [0, 2^31 - 1]
+"
+		.to_string(),
+	);
+
+	retval.insert(
 		"[logging]".to_string(),
 		"
 #########################################

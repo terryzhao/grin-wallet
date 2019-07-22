@@ -32,7 +32,7 @@ use crate::core::core::Transaction;
 use crate::core::{global, ser};
 use crate::libwallet::{check_repair, check_repair_batch, restore, restore_batch};
 use crate::libwallet::{
-	AcctPathMapping, Context, Error, ErrorKind, NodeClient, OutputData, PaymentCommits,
+	AcctPathMapping, Context, Error, ErrorKind, Listener, NodeClient, OutputData, PaymentCommits,
 	PaymentData, TxLogEntry, WalletBackend, WalletOutputBatch,
 };
 use crate::util;
@@ -105,6 +105,8 @@ pub struct LMDBBackend<C, K> {
 	parent_key_id: Identifier,
 	/// wallet to node client
 	w2n_client: C,
+	/// Grin Relay Listener
+	pub grinrelay_listener: Option<Box<dyn Listener>>,
 }
 
 impl<C, K> LMDBBackend<C, K> {
@@ -143,6 +145,7 @@ impl<C, K> LMDBBackend<C, K> {
 			keychain: None,
 			parent_key_id: LMDBBackend::<C, K>::default_path(),
 			w2n_client: n_client,
+			grinrelay_listener: None,
 		};
 		Ok(res)
 	}
@@ -204,6 +207,20 @@ where
 	/// Update passphrase
 	fn update_passphrase(&mut self, new_password: &str) {
 		self.passphrase = ZeroingString::from(new_password);
+	}
+
+	/// Set the Grin Relay listener
+	fn set_grinrelay_listener(&mut self, listener: Box<dyn Listener>) {
+		self.grinrelay_listener = Some(listener);
+	}
+
+	/// Return the Grin Relay listener
+	fn grinrelay_listener(&self) -> Result<Box<dyn Listener>, Error> {
+		if let Some(ref listener) = self.grinrelay_listener {
+			Ok(listener.clone().into())
+		} else {
+			Err(ErrorKind::GenericError("Grin Relay listener not set!".to_string()).into())
+		}
 	}
 
 	/// return the version of the commit for caching

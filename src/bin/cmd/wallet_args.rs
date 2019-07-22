@@ -942,11 +942,7 @@ pub fn wallet_command(
 		}
 		("send", Some(args)) => {
 			let a = arg_parse!(parse_send_args(&args));
-			command::send(
-				inst_wallet(),
-				a,
-				wallet_config.dark_background_color_scheme.unwrap_or(true),
-			)
+			command::send(inst_wallet(), a, &wallet_config)
 		}
 		("receive", Some(args)) => {
 			let a = arg_parse!(parse_receive_args(&args));

@@ -15,13 +15,17 @@
 //! Controller for wallet.. instantiates and handles listeners (or single-run
 //! invocations) as needed.
 use crate::api::{self, ApiServer, BasicAuthMiddleware, ResponseFuture, Router, TLSConfig};
+use crate::config::GrinRelayConfig;
 use crate::keychain::Keychain;
 use crate::libwallet::{
-	Error, ErrorKind, NodeClient, NodeVersionInfo, Slate, WalletBackend, CURRENT_SLATE_VERSION,
-	GRIN_BLOCK_HEADER_VERSION,
+	Error, ErrorKind, Listener, NodeClient, NodeVersionInfo, Slate, SlateVersion, VersionedSlate,
+	WalletBackend, CURRENT_SLATE_VERSION, GRIN_BLOCK_HEADER_VERSION,
 };
+
+use crate::util::secp::key::PublicKey;
 use crate::util::to_base64;
 use crate::util::Mutex;
+use colored::*;
 use failure::ResultExt;
 use futures::future::{err, ok};
 use futures::{Future, Stream};
@@ -31,7 +35,16 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use std::marker::PhantomData;
 use std::net::SocketAddr;
+use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
+
+use crate::grinrelay::hasher::derive_address_key;
+use crate::grinrelay::GrinboxAddress;
+use crate::grinrelay::{
+	Controller, GrinboxListener, GrinboxPublisher, GrinboxSubscriber, Subscriber,
+};
 
 use crate::apiwallet::{Foreign, ForeignCheckMiddlewareFn, ForeignRpc, Owner, OwnerRpc};
 use easy_jsonrpc;
@@ -157,13 +170,16 @@ pub fn foreign_listener<T: ?Sized, C, K>(
 	wallet: Arc<Mutex<T>>,
 	addr: &str,
 	tls_config: Option<TLSConfig>,
+	relay_rx_as_payee: Option<Receiver<(String, Slate)>>,
+	grinrelay_listener: Box<dyn Listener>,
+	account: &str,
 ) -> Result<(), Error>
 where
 	T: WalletBackend<C, K> + Send + Sync + 'static,
 	C: NodeClient + 'static,
 	K: Keychain + 'static,
 {
-	let api_handler_v2 = ForeignAPIHandlerV2::new(wallet);
+	let api_handler_v2 = ForeignAPIHandlerV2::new(wallet.clone());
 
 	let mut router = Router::new();
 
@@ -181,9 +197,99 @@ where
 			))?;
 	warn!("HTTP Foreign listener started.");
 
+	if let Some(relay_rx_as_payee) = relay_rx_as_payee {
+		let api = Foreign::new(wallet, None);
+		loop {
+			match relay_rx_as_payee.try_recv() {
+				Ok((addr, slate)) => {
+					let slate_id = slate.id;
+					if api.verify_slate_messages(&slate).is_ok() {
+						let slate_rx = api.receive_tx(&slate, Some(account), None);
+						if let Ok(slate_rx) = slate_rx {
+							let versioned_slate =
+								VersionedSlate::into_version(slate_rx.clone(), SlateVersion::V2);
+							grinrelay_listener.publish(&versioned_slate, &addr.to_owned())?;
+							info!(
+								"Slate [{}] sent back to {} successfully",
+								slate_id.to_string().bright_green(),
+								addr.bright_green(),
+							);
+						}
+					}
+				}
+				Err(TryRecvError::Disconnected) => break,
+				Err(TryRecvError::Empty) => {}
+			}
+			thread::sleep(Duration::from_millis(100));
+		}
+	}
+
 	api_thread
 		.join()
 		.map_err(|e| ErrorKind::GenericError(format!("API thread panicked :{:?}", e)).into())
+}
+
+/// Grin Relay Listener
+pub fn grinrelay_listener<T: ?Sized, C, K>(
+	wallet: Arc<Mutex<T>>,
+	grinrelay_config: GrinRelayConfig,
+	relay_tx_as_payer: Option<Sender<Slate>>,
+	relay_tx_as_payee: Option<Sender<(String, Slate)>>,
+) -> Result<Box<dyn Listener>, Error>
+where
+	T: WalletBackend<C, K> + Send + Sync + 'static,
+	C: NodeClient + 'static,
+	K: Keychain + 'static,
+{
+	let index = grinrelay_config.grinrelay_address_index;
+
+	let (sec_key, pub_key) = {
+		let mut w = wallet.lock();
+		w.open_with_credentials()?;
+		let keychain = w.keychain();
+		let sec_key = derive_address_key(keychain, index)?;
+		let pub_key = PublicKey::from_secret_key(keychain.secp(), &sec_key)?;
+		(sec_key, pub_key)
+	};
+
+	let address = GrinboxAddress::new(
+		pub_key,
+		Some(grinrelay_config.grinrelay_domain.clone()),
+		Some(grinrelay_config.grinrelay_port),
+	);
+
+	let publisher = GrinboxPublisher::new(
+		&address,
+		&sec_key,
+		grinrelay_config.grinrelay_protocol_unsecure,
+	)?;
+
+	let subscriber = GrinboxSubscriber::new(&publisher)?;
+
+	let caddress = address.clone();
+	let mut csubscriber = subscriber.clone();
+	let cpublisher = publisher.clone();
+	let _handle = thread::spawn(move || {
+		let controller = Controller::new(
+			&caddress.stripped(),
+			cpublisher,
+			relay_tx_as_payer,
+			relay_tx_as_payee,
+		)
+		.expect("could not start grinrelay controller!");
+
+		csubscriber
+			.start(controller)
+			.expect("something went wrong!");
+		()
+	});
+
+	Ok(Box::new(GrinboxListener {
+		address,
+		publisher,
+		subscriber,
+		//		handle,
+	}))
 }
 
 type WalletResponseFuture = Box<dyn Future<Item = Response<Body>, Error = Error> + Send>;

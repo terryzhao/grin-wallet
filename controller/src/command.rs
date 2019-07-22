@@ -18,6 +18,7 @@ use std::collections::HashMap;
 /// Grin wallet command-line function implementations
 use std::fs::File;
 use std::io::Write;
+use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -40,6 +41,8 @@ use crate::libwallet::{
 	InitTxArgs, IssueInvoiceTxArgs, NodeClient, OutputStatus, TxLogEntryType, WalletInst,
 };
 use crate::{controller, display};
+use grin_wallet_impls::GrinrelayWalletCommAdapter;
+use grin_wallet_libwallet::Listener;
 
 /// Arguments common to all wallet commands
 #[derive(Clone)]
@@ -142,7 +145,25 @@ pub fn listen(config: &WalletConfig, args: &ListenArgs, g_args: &GlobalArgs) -> 
 				)),
 				None => None,
 			};
-			controller::foreign_listener(wallet.clone(), &listen_addr, tls_conf)?;
+
+			// The streaming channel between 'grinrelay_listener' and 'foreign_listener'
+			let (relay_tx_as_payee, relay_rx) = channel();
+
+			let grinrelay_listener = controller::grinrelay_listener(
+				wallet.clone(),
+				config.grinrelay_config.clone().unwrap_or_default(),
+				None,
+				Some(relay_tx_as_payee),
+			)?;
+
+			controller::foreign_listener(
+				wallet.clone(),
+				&listen_addr,
+				tls_conf,
+				Some(relay_rx),
+				grinrelay_listener,
+				&g_args.account,
+			)?;
 			Ok(())
 		}
 		"keybase" => {
@@ -238,8 +259,26 @@ pub struct SendArgs {
 pub fn send(
 	wallet: Arc<Mutex<WalletInst<impl NodeClient + 'static, keychain::ExtKeychain>>>,
 	args: SendArgs,
-	dark_scheme: bool,
+	wallet_config: &WalletConfig,
 ) -> Result<(), Error> {
+	let dark_scheme = wallet_config.dark_background_color_scheme.unwrap_or(true);
+
+	// The streaming channel between 'grinrelay_listener' and 'GrinrelayWalletCommAdapter'
+	let (relay_tx_as_payer, relay_rx) = channel();
+
+	let mut grinrelay_listener: Option<Box<Listener>> = None;
+	if "relay" == args.method.as_str() {
+		// Start a Grin Relay service firstly
+		let listener = controller::grinrelay_listener(
+			wallet.clone(),
+			wallet_config.grinrelay_config.clone().unwrap_or_default(),
+			Some(relay_tx_as_payer),
+			None,
+		)?;
+		grinrelay_listener = Some(listener);
+		thread::sleep(Duration::from_millis(1_000));
+	}
+
 	controller::owner_single_use(wallet.clone(), |api| {
 		if args.estimate_selection_strategies {
 			let strategies = vec!["smallest", "biggest", "all"]
@@ -292,6 +331,7 @@ pub fn send(
 			let adapter = match args.method.as_str() {
 				"http" => HTTPWalletCommAdapter::new(),
 				"file" => FileWalletCommAdapter::new(),
+				"relay" => GrinrelayWalletCommAdapter::new(grinrelay_listener.unwrap(), relay_rx),
 				"keybase" => KeybaseWalletCommAdapter::new(),
 				"self" => NullWalletCommAdapter::new(),
 				_ => NullWalletCommAdapter::new(),

@@ -933,6 +933,43 @@ impl From<SlateV2> for Slate {
 	}
 }
 
+impl From<&SlateV2> for Slate {
+	fn from(slate: &SlateV2) -> Slate {
+		let SlateV2 {
+			num_participants,
+			id,
+			tx,
+			amount,
+			fee,
+			height,
+			lock_height,
+			participant_data,
+			version_info,
+		} = slate;
+		let num_participants = *num_participants;
+		let id = id.clone();
+		let tx = Transaction::from(tx);
+		let amount = *amount;
+		let fee = *fee;
+		let height = *height;
+		let lock_height = *lock_height;
+		let participant_data = map_vec!(participant_data, |data| ParticipantData::from(data));
+		let version_info = VersionCompatInfo::from(version_info);
+
+		Slate {
+			num_participants,
+			id,
+			tx,
+			amount,
+			fee,
+			height,
+			lock_height,
+			participant_data,
+			version_info,
+		}
+	}
+}
+
 impl From<&ParticipantDataV2> for ParticipantData {
 	fn from(data: &ParticipantDataV2) -> ParticipantData {
 		let ParticipantDataV2 {
@@ -982,6 +1019,15 @@ impl From<TransactionV2> for Transaction {
 	fn from(tx: TransactionV2) -> Transaction {
 		let TransactionV2 { offset, body } = tx;
 		let body = TransactionBody::from(&body);
+		Transaction { offset, body }
+	}
+}
+
+impl From<&TransactionV2> for Transaction {
+	fn from(tx: &TransactionV2) -> Transaction {
+		let TransactionV2 { offset, body } = tx;
+		let offset = offset.clone();
+		let body = TransactionBody::from(body);
 		Transaction { offset, body }
 	}
 }

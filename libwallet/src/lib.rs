@@ -46,6 +46,7 @@ extern crate strum_macros;
 pub mod api_impl;
 mod error;
 mod internal;
+pub mod listener;
 mod slate;
 pub mod slate_versions;
 mod types;
@@ -60,6 +61,7 @@ pub use api_impl::types::{
 	OutputCommitMapping, PaymentCommitMapping, SendTXArgs, VersionInfo,
 };
 pub use internal::restore::{check_repair, check_repair_batch, restore, restore_batch};
+pub use listener::Listener;
 pub use types::{
 	AcctPathMapping, BlockIdentifier, Context, NodeClient, NodeVersionInfo, OutputData,
 	OutputStatus, PaymentCommits, PaymentData, TxLogEntry, TxLogEntryType, TxWrapper,

@@ -110,6 +110,7 @@ subcommands:
             possible_values:
               - http
               - file
+              - relay
               - self
               - keybase
             default_value: http

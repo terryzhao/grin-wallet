@@ -40,8 +40,8 @@ mod seed;
 pub mod test_framework;
 
 pub use crate::adapters::{
-	FileWalletCommAdapter, HTTPWalletCommAdapter, KeybaseWalletCommAdapter, NullWalletCommAdapter,
-	WalletCommAdapter,
+	FileWalletCommAdapter, GrinrelayWalletCommAdapter, HTTPWalletCommAdapter,
+	KeybaseWalletCommAdapter, NullWalletCommAdapter, WalletCommAdapter,
 };
 pub use crate::backends::{wallet_db_exists, LMDBBackend};
 pub use crate::error::{Error, ErrorKind};

@@ -84,3 +84,11 @@ impl From<VersionedSlate> for Slate {
 		}
 	}
 }
+
+impl From<&VersionedSlate> for Slate {
+	fn from(slate: &VersionedSlate) -> Slate {
+		match slate {
+			VersionedSlate::V2(s) => Slate::from(s),
+		}
+	}
+}

@@ -325,3 +325,9 @@ impl From<grin_store::Error> for Error {
 		Error::from(ErrorKind::Backend(format!("{}", error)))
 	}
 }
+
+impl From<failure::Error> for Error {
+	fn from(error: failure::Error) -> Error {
+		Error::from(ErrorKind::GenericError(format!("{}", error)))
+	}
+}

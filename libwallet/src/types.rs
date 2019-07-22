@@ -23,6 +23,7 @@ use crate::grin_core::ser;
 use crate::grin_keychain::{Identifier, Keychain};
 use crate::grin_util::secp::key::{PublicKey, SecretKey};
 use crate::grin_util::secp::{self, pedersen, Secp256k1};
+use crate::listener::Listener;
 use crate::slate::ParticipantMessages;
 use chrono::prelude::*;
 use failure::ResultExt;
@@ -73,6 +74,12 @@ where
 
 	/// Update passphrase
 	fn update_passphrase(&mut self, new_password: &str);
+
+	/// Set the Grin Relay listener
+	fn set_grinrelay_listener(&mut self, listener: Box<dyn Listener>);
+
+	/// Return the Grin Relay listener
+	fn grinrelay_listener(&self) -> Result<Box<dyn Listener>, Error>;
 
 	/// return the commit for caching if allowed, none otherwise
 	fn calc_commit_for_cache(

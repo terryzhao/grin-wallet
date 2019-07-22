@@ -56,6 +56,8 @@ pub struct WalletConfig {
 	pub dark_background_color_scheme: Option<bool>,
 	/// The exploding lifetime (minutes) for keybase notification on coins received
 	pub keybase_notify_ttl: Option<u16>,
+	/// Grin Relay config
+	pub grinrelay_config: Option<GrinRelayConfig>,
 }
 
 impl Default for WalletConfig {
@@ -75,6 +77,7 @@ impl Default for WalletConfig {
 			tls_certificate_key: None,
 			dark_background_color_scheme: Some(true),
 			keybase_notify_ttl: Some(1440),
+			grinrelay_config: Some(GrinRelayConfig::default()),
 		}
 	}
 }
@@ -101,6 +104,31 @@ impl WalletConfig {
 		format!("127.0.0.1:{}", self.owner_api_listen_port())
 	}
 }
+
+/// Grin Relay configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GrinRelayConfig {
+	/// Grin Relay server domain
+	pub grinrelay_domain: String,
+	/// Grin Relay server port
+	pub grinrelay_port: u16,
+	/// Grin Relay use ws or wss
+	pub grinrelay_protocol_unsecure: bool,
+	/// Grin Relay address index
+	pub grinrelay_address_index: u32,
+}
+
+impl Default for GrinRelayConfig {
+	fn default() -> GrinRelayConfig {
+		GrinRelayConfig {
+			grinrelay_domain: "relay.grin.icu".to_string(),
+			grinrelay_port: 3418,
+			grinrelay_protocol_unsecure: false,
+			grinrelay_address_index: 0,
+		}
+	}
+}
+
 /// Error type wrapping config errors.
 #[derive(Debug)]
 pub enum ConfigError {
