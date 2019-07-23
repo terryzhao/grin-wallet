@@ -123,7 +123,7 @@ impl Default for GrinRelayConfig {
 		GrinRelayConfig {
 			grinrelay_domain: "relay.grin.icu".to_string(),
 			grinrelay_port: 3418,
-			grinrelay_protocol_unsecure: false,
+			grinrelay_protocol_unsecure: true,
 			grinrelay_address_index: 0,
 		}
 	}
