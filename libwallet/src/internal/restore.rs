@@ -69,7 +69,7 @@ where
 {
 	let mut wallet_outputs: Vec<OutputResult> = Vec::new();
 
-	warn!(
+	debug!(
 		"Scanning {} outputs in the current Grin utxo set",
 		outputs.len(),
 	);
@@ -149,7 +149,7 @@ where
 		let (highest_index, last_retrieved_index, outputs) = wallet
 			.w2n_client()
 			.get_outputs_by_pmmr_index(start_index, batch_size)?;
-		warn!(
+		info!(
 			"Checking {} outputs, up to index {}. (Highest index: {})",
 			outputs.len(),
 			highest_index,
@@ -416,9 +416,9 @@ where
 {
 	// First, get a definitive list of outputs we own from the chain
 	let now = Instant::now();
-	warn!("Starting wallet check.");
+	info!("Starting wallet check.");
 	let chain_outs = collect_chain_outputs(wallet)?;
-	warn!(
+	info!(
 		"Identified {} wallet_outputs as belonging to this wallet",
 		chain_outs.len(),
 	);
@@ -470,7 +470,7 @@ where
 	C: NodeClient,
 	K: Keychain,
 {
-	warn!(
+	info!(
 		"Identified {} wallet_outputs as belonging to this wallet",
 		outputs.len(),
 	);
@@ -533,7 +533,7 @@ where
 	}
 
 	let now = Instant::now();
-	warn!("Starting restore.");
+	info!("Starting restore.");
 
 	let result_vec = collect_chain_outputs(wallet)?;
 

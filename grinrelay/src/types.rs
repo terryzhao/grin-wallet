@@ -133,7 +133,7 @@ where
 	P: Publisher,
 {
 	fn on_open(&self) {
-		warn!("Listener for {} started", self.name.bright_green());
+		info!("Listener for {} started", self.name.bright_green());
 	}
 
 	fn on_slate(

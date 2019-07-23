@@ -29,7 +29,7 @@ use crate::comments::insert_comments;
 use crate::core::global;
 use crate::types::WalletConfig;
 use crate::types::{ConfigError, GlobalWalletConfig, GlobalWalletConfigMembers};
-use crate::util::LoggingConfig;
+use grin_wallet_util::LoggingConfig;
 
 /// Wallet configuration file name
 pub const WALLET_CONFIG_FILE_NAME: &'static str = "grin-wallet.toml";

@@ -20,9 +20,22 @@
 #![deny(unused_mut)]
 #![warn(missing_docs)]
 
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate serde_derive;
+
+mod logger;
+mod types;
+
 pub use grin_api;
 pub use grin_chain;
 pub use grin_core;
 pub use grin_keychain;
 pub use grin_store;
 pub use grin_util;
+
+pub use logger::init_logger;
+pub use types::LoggingConfig;

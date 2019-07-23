@@ -70,6 +70,6 @@ pub fn instantiate_wallet(
 	let _ = WalletSeed::from_file(wallet_config.data_file_dir.as_str(), passphrase)?;
 	let mut db_wallet = LMDBBackend::new(wallet_config.clone(), passphrase, node_client)?;
 	db_wallet.set_parent_key_id_by_name(account)?;
-	info!("Using LMDB Backend for wallet");
+	info!("A Wallet instance instantiated");
 	Ok(Arc::new(Mutex::new(db_wallet)))
 }

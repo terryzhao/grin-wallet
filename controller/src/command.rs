@@ -879,7 +879,7 @@ pub fn restore(
 		let result = api.restore();
 		match result {
 			Ok(_) => {
-				warn!("Wallet restore complete",);
+				info!("Wallet restore complete",);
 				Ok(())
 			}
 			Err(e) => {
@@ -902,12 +902,12 @@ pub fn check_repair(
 	args: CheckArgs,
 ) -> Result<(), Error> {
 	controller::owner_single_use(wallet.clone(), |api| {
-		warn!("Starting wallet check...",);
-		warn!("Updating all wallet outputs, please wait ...",);
+		info!("Starting wallet check...",);
+		info!("Updating all wallet outputs, please wait ...",);
 		let result = api.check_repair(args.delete_unconfirmed);
 		match result {
 			Ok(_) => {
-				warn!("Wallet check complete",);
+				info!("Wallet check complete",);
 				Ok(())
 			}
 			Err(e) => {

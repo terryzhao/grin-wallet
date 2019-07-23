@@ -19,7 +19,7 @@ use std::io;
 use std::path::PathBuf;
 
 use crate::core::global::ChainTypes;
-use crate::util::LoggingConfig;
+use grin_wallet_util::LoggingConfig;
 
 /// Command-line wallet configuration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

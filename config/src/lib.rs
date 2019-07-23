@@ -24,7 +24,6 @@
 extern crate serde_derive;
 
 use grin_wallet_util::grin_core as core;
-use grin_wallet_util::grin_util as util;
 
 mod comments;
 pub mod config;
