@@ -51,7 +51,7 @@ case "${CI_JOB}" in
 
             "windows")
                 cargo clean && \
-                cargo build --release
+                VCPKG_ROOT="$TRAVIS_BUILD_DIR/vkpkg/" cargo build --release
                 readonly ARCHIVE_CMD="7z a -tzip"
                 readonly BIN_SUFFIX=".exe"
                 readonly PKG_NAME="grin-wallet-${REPO_TAG}-${JOB_ID}-win-x64"
