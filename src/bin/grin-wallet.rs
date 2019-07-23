@@ -22,6 +22,7 @@ extern crate log;
 use crate::core::global;
 use crate::util::init_logger;
 use clap::App;
+use colored::*;
 use grin_wallet_config as config;
 use grin_wallet_util::grin_api as api;
 use grin_wallet_util::grin_core as core;
@@ -38,8 +39,9 @@ pub mod built_info {
 pub fn info_strings() -> (String, String) {
 	(
 		format!(
-			"This is Grin Wallet version {}{}, built for {} by {}.",
-			built_info::PKG_VERSION,
+			"This is {} version [{}]{}, built for {} by {}.",
+			"GrinWallet+".bright_green(),
+			built_info::PKG_VERSION.to_string().bright_green(),
 			built_info::GIT_VERSION.map_or_else(|| "".to_owned(), |v| format!(" (git {})", v)),
 			built_info::TARGET,
 			built_info::RUSTC_VERSION,
