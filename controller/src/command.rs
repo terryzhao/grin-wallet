@@ -33,16 +33,14 @@ use crate::keychain;
 use crate::config::WalletConfig;
 use crate::error::{Error, ErrorKind};
 use crate::impls::{
-	instantiate_wallet, FileWalletCommAdapter, HTTPWalletCommAdapter, KeybaseWalletCommAdapter,
-	LMDBBackend, NullWalletCommAdapter,
+	instantiate_wallet, FileWalletCommAdapter, GrinrelayWalletCommAdapter, HTTPWalletCommAdapter,
+	KeybaseWalletCommAdapter, LMDBBackend, NullWalletCommAdapter,
 };
 use crate::impls::{HTTPNodeClient, WalletSeed};
 use crate::libwallet::{
-	InitTxArgs, IssueInvoiceTxArgs, NodeClient, OutputStatus, TxLogEntryType, WalletInst,
+	InitTxArgs, IssueInvoiceTxArgs, Listener, NodeClient, OutputStatus, TxLogEntryType, WalletInst,
 };
 use crate::{controller, display};
-use grin_wallet_impls::GrinrelayWalletCommAdapter;
-use grin_wallet_libwallet::Listener;
 
 /// Arguments common to all wallet commands
 #[derive(Clone)]
