@@ -50,6 +50,7 @@ case "${CI_JOB}" in
                 ;;
 
             "windows")
+                git clone --depth 1 https://github.com/Microsoft/vcpkg.git && cd vcpkg && ./bootstrap-vcpkg.bat && ./vcpkg install openssl:x64-windows-static && cd - > /dev/null || exit 1;
                 cargo clean && \
                 VCPKG_ROOT="$TRAVIS_BUILD_DIR/vkpkg/" cargo build --release
                 readonly ARCHIVE_CMD="7z a -tzip"
