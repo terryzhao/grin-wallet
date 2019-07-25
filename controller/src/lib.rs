@@ -41,4 +41,4 @@ mod error;
 
 pub use crate::error::{Error, ErrorKind};
 pub use chrono::NaiveDateTime as DateTime;
-pub use controller::grinrelay_listener;
+pub use controller::{grinrelay_address, grinrelay_listener};

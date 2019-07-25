@@ -208,12 +208,25 @@ where
 						if let Ok(slate_rx) = slate_rx {
 							let versioned_slate =
 								VersionedSlate::into_version(slate_rx.clone(), SlateVersion::V2);
-							grinrelay_listener.publish(&versioned_slate, &addr.to_owned())?;
-							info!(
-								"Slate [{}] sent back to {} successfully",
-								slate_id.to_string().bright_green(),
-								addr.bright_green(),
-							);
+							let res =
+								grinrelay_listener.publish(&versioned_slate, &addr.to_owned());
+							match res {
+								Ok(_) => {
+									info!(
+										"Slate [{}] sent back to {} successfully",
+										slate_id.to_string().bright_green(),
+										addr.bright_green(),
+									);
+								}
+								Err(e) => {
+									error!(
+										"Slate [{}] fail to sent back to {} for {}",
+										slate_id.to_string().bright_green(),
+										addr.bright_green(),
+										e,
+									);
+								}
+							}
 						}
 					}
 				}
@@ -227,6 +240,35 @@ where
 	api_thread
 		.join()
 		.map_err(|e| ErrorKind::GenericError(format!("API thread panicked :{:?}", e)).into())
+}
+
+/// Get the Grin Relay Address
+pub fn grinrelay_address<T: ?Sized, C, K>(
+	wallet: Arc<Mutex<T>>,
+	grinrelay_config: GrinRelayConfig,
+) -> Result<String, Error>
+where
+	T: WalletBackend<C, K> + Send + Sync + 'static,
+	C: NodeClient + 'static,
+	K: Keychain + 'static,
+{
+	let index = grinrelay_config.grinrelay_address_index;
+
+	let pub_key = {
+		let mut w = wallet.lock();
+		w.open_with_credentials()?;
+		let keychain = w.keychain();
+		let sec_key = derive_address_key(keychain, index)?;
+		PublicKey::from_secret_key(keychain.secp(), &sec_key)?
+	};
+
+	let address = GrinboxAddress::new(
+		pub_key,
+		Some(grinrelay_config.grinrelay_domain.clone()),
+		Some(grinrelay_config.grinrelay_port),
+	);
+
+	Ok(address.stripped())
 }
 
 /// Grin Relay Listener
