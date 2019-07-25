@@ -247,7 +247,7 @@ impl GrinboxBroker {
 					debug!("Select {} got rtt: {:.3}(ms)", addr, rtt_ms);
 				}
 				Err(e) => {
-					error!(
+					debug!(
 						"Select {} failed on connect! fail on {:.0} seconds for {}",
 						addr,
 						rtt_ms / 1000f64,
