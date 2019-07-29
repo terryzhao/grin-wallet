@@ -504,7 +504,7 @@ pub fn parse_send_args(args: &ArgMatches) -> Result<command::SendArgs, ParseErro
 	let estimate_selection_strategies = args.is_present("estimate_selection_strategies");
 
 	// method
-	let method = parse_required(args, "method")?;
+	let mut method = parse_required(args, "method")?;
 
 	// dest
 	let dest = {
@@ -521,6 +521,15 @@ pub fn parse_send_args(args: &ArgMatches) -> Result<command::SendArgs, ParseErro
 			}
 		}
 	};
+
+	if dest.starts_with("grinrelay://tn1") || dest.starts_with("grinrelay://gn1") {
+		method = "relay";
+	}
+
+	if (dest.starts_with("tn1") || dest.starts_with("gn1")) && dest.len() >= 62 {
+		method = "relay";
+	}
+
 	if !estimate_selection_strategies
 		&& method == "http"
 		&& !dest.starts_with("http://")
