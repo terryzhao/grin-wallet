@@ -112,6 +112,23 @@ fn real_main() -> i32 {
 		w.config_file_path.as_ref().unwrap().to_str().unwrap()
 	);
 
+	// Select nearest node server
+	let c = w.members.as_mut().unwrap().wallet.clone();
+	if c.check_node_api_http_addr
+		.starts_with("https://nodes.grin.icu")
+	{
+		match config::select_node_server(c.check_node_api_http_addr.as_str()) {
+			Ok(best) => {
+				let mut new_config = c;
+				new_config.check_node_api_http_addr = best;
+				w.members.as_mut().unwrap().wallet = new_config;
+			}
+			Err(e) => {
+				error!("select_node_server fail on {}", e);
+			}
+		}
+	}
+
 	log_build_info();
 
 	global::set_mining_mode(

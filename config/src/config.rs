@@ -14,14 +14,19 @@
 
 //! Configuration file management
 
+use chrono::prelude::Utc;
 use dirs;
+use dns_lookup::lookup_addr;
 use rand::distributions::{Alphanumeric, Distribution};
 use rand::thread_rng;
+use regex::Regex;
 use std::env;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::io::Read;
+use std::net::ToSocketAddrs;
+use std::net::{SocketAddr, TcpStream};
 use std::path::PathBuf;
 use toml;
 
@@ -34,7 +39,7 @@ use grin_wallet_util::LoggingConfig;
 /// Wallet configuration file name
 pub const WALLET_CONFIG_FILE_NAME: &'static str = "grin-wallet.toml";
 const WALLET_LOG_FILE_NAME: &'static str = "grin-wallet.log";
-const GRIN_HOME: &'static str = ".grin";
+const GRIN_HOME: &'static str = ".grin.w";
 /// Wallet data directory
 pub const GRIN_WALLET_DIR: &'static str = "wallet_data";
 /// API secret
@@ -161,10 +166,14 @@ impl GlobalWalletConfig {
 		defaults.chain_type = Some(chain_type.clone());
 
 		match *chain_type {
-			global::ChainTypes::Mainnet => {}
+			global::ChainTypes::Mainnet => {
+				defaults.check_node_api_http_addr = "https://nodes.grin.icu:3413".to_owned();
+				defaults.node_api_secret = Some("V6JvDqb6GddgIcfqn8tL".to_string());
+			}
 			global::ChainTypes::Floonet => {
 				defaults.api_listen_port = 13415;
-				defaults.check_node_api_http_addr = "http://127.0.0.1:13413".to_owned();
+				defaults.check_node_api_http_addr = "https://nodes.grin.icu:13413".to_owned();
+				defaults.node_api_secret = Some("ZbiQCN85Srih3f27PJXH".to_string());
 			}
 			global::ChainTypes::UserTesting => {
 				defaults.api_listen_port = 23415;
@@ -233,8 +242,6 @@ impl GlobalWalletConfig {
 			Some(secret_path.to_str().unwrap().to_owned());
 		let mut node_secret_path = wallet_home.clone();
 		node_secret_path.push(API_SECRET_FILE_NAME);
-		self.members.as_mut().unwrap().wallet.node_api_secret_path =
-			Some(node_secret_path.to_str().unwrap().to_owned());
 		let mut log_path = wallet_home.clone();
 		log_path.push(WALLET_LOG_FILE_NAME);
 		self.members
@@ -269,4 +276,73 @@ impl GlobalWalletConfig {
 		file.write_all(conf_out.as_bytes())?;
 		Ok(())
 	}
+}
+
+/// Select a nearest node server
+pub fn select_node_server(check_node_api_http_addr: &str) -> Result<String, ConfigError> {
+	const NANO_TO_MILLIS: f64 = 1.0 / 1_000_000.0;
+	const NODES_DOMAIN_REGEX: &str =
+		r"^(https://)?(?P<nodes_domain>[a-zA-Z0-9\.]+):(?P<port>[0-9]*)$";
+
+	let re = Regex::new(NODES_DOMAIN_REGEX).unwrap();
+	let captures = re.captures(check_node_api_http_addr);
+	let captures = captures.unwrap();
+	let nodes_domain = captures
+		.name("nodes_domain")
+		.map(|m| m.as_str().to_string())
+		.unwrap();
+	let port = captures
+		.name("port")
+		.map(|m| u16::from_str_radix(m.as_str(), 10).unwrap())
+		.unwrap();
+
+	let mut addresses: Vec<SocketAddr> = vec![];
+	let addrs = (nodes_domain.as_str(), 0).to_socket_addrs()?;
+	addresses.append(
+		&mut (addrs
+			.map(|mut addr| {
+				addr.set_port(3419);
+				addr
+			})
+			.collect()),
+	);
+
+	let mut selected_addr = addresses[0];
+	let mut min_rtt = 10_000f64;
+	//debug!("Start selecting on {} node servers", addresses.len());
+	for addr in addresses {
+		let url = format!("{}", addr);
+
+		let start = Utc::now().timestamp_nanos();
+		let stream = TcpStream::connect(url);
+
+		let fin = Utc::now().timestamp_nanos();
+		let rtt_ms = (fin - start) as f64 * NANO_TO_MILLIS;
+		match stream {
+			Ok(_) => {
+				if rtt_ms < min_rtt {
+					min_rtt = rtt_ms;
+					selected_addr = addr;
+				}
+				//debug!("Select {} got rtt: {:.3}(ms)", addr, rtt_ms);
+			}
+			Err(e) => {
+				debug!(
+					"Select {} failed on connect! fail on {:.0} seconds for {}",
+					addr,
+					rtt_ms / 1000f64,
+					e,
+				);
+			}
+		}
+	}
+
+	// switch back to domain by reverse dns, for https and redundancy features
+	let mut domain = lookup_addr(&selected_addr.ip())?;
+	domain = domain.replace(".relay.", ".");
+	debug!(
+		"Server '{}' selected as node api service. rtt: {:.3}(ms)",
+		domain, min_rtt
+	);
+	Ok(format!("https://{}:{}", domain, port))
 }

@@ -29,8 +29,8 @@ pub enum LogLevel {
 	Trace,
 }
 
-/// 32 log files to rotate over by default
-pub const DEFAULT_ROTATE_LOG_FILES: u32 = 32 as u32;
+/// 3 log files to rotate over by default
+pub const DEFAULT_ROTATE_LOG_FILES: u32 = 3 as u32;
 
 /// Logging config
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

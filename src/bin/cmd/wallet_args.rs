@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Argument parsing and error handling for wallet commands
+
 use crate::api::TLSConfig;
-use crate::util::file::get_first_line;
 use crate::util::{Mutex, ZeroingString};
-/// Argument parsing and error handling for wallet commands
 use clap::ArgMatches;
+use colored::*;
 use failure::Fail;
 use grin_wallet_config::WalletConfig;
 use grin_wallet_controller::command;
@@ -238,9 +239,10 @@ pub fn inst_wallet(
 		Err(e) => {
 			let msg = {
 				match e.kind() {
-					grin_wallet_impls::ErrorKind::Encryption => {
-						format!("Error decrypting wallet seed (check provided password)")
-					}
+					grin_wallet_impls::ErrorKind::Encryption => format!(
+						"Error decrypting wallet seed ({})",
+						"wrong password?".blue()
+					),
 					_ => format!("Error instantiating wallet: {}", e),
 				}
 			};
@@ -347,7 +349,6 @@ pub fn parse_global_args(
 	if args.is_present("show_spent") {
 		show_spent = true;
 	}
-	let node_api_secret = get_first_line(config.node_api_secret_path.clone());
 	let password = match args.value_of("pass") {
 		None => None,
 		Some(p) => Some(ZeroingString::from(p)),
@@ -370,7 +371,7 @@ pub fn parse_global_args(
 	Ok(command::GlobalArgs {
 		account: account.to_owned(),
 		show_spent: show_spent,
-		node_api_secret: node_api_secret,
+		node_api_secret: config.node_api_secret.clone(),
 		password: password,
 		tls_conf: tls_conf,
 	})

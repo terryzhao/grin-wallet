@@ -10,7 +10,11 @@ workspace = ".."
 edition = "2018"
 
 [dependencies]
+chrono = "0.4.5"
+dns-lookup = "1.0"
+log = "0.4"
 rand = "0.5"
+regex = "1"
 serde = "1"
 serde_derive = "1"
 toml = "0.4"

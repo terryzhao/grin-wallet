@@ -74,9 +74,9 @@ fn comments() -> HashMap<String, String> {
 		.to_string(),
 	);
 	retval.insert(
-		"node_api_secret_path".to_string(),
+		"node_api_secret".to_string(),
 		"
-#location of the node api secret for basic auth on the Grin API
+#the node api secret for basic auth on the Grin API
 "
 		.to_string(),
 	);
@@ -224,6 +224,14 @@ fn comments() -> HashMap<String, String> {
 		"
 #maximum log file size in bytes before performing log rotation
 #comment it to disable log rotation
+"
+		.to_string(),
+	);
+
+	retval.insert(
+		"log_max_files".to_string(),
+		"
+#maximum count of the log files to rotate over
 "
 		.to_string(),
 	);

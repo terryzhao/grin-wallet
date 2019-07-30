@@ -22,6 +22,8 @@
 
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate log;
 
 use grin_wallet_util::grin_core as core;
 
@@ -29,5 +31,7 @@ mod comments;
 pub mod config;
 pub mod types;
 
-pub use crate::config::{initial_setup_wallet, GRIN_WALLET_DIR, WALLET_CONFIG_FILE_NAME};
+pub use crate::config::{
+	initial_setup_wallet, select_node_server, GRIN_WALLET_DIR, WALLET_CONFIG_FILE_NAME,
+};
 pub use crate::types::{ConfigError, GlobalWalletConfig, GrinRelayConfig, WalletConfig};
