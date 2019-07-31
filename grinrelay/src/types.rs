@@ -133,7 +133,10 @@ where
 	P: Publisher,
 {
 	fn on_open(&self) {
-		info!("Listener for {} started", self.name.bright_green());
+		info!(
+			"Grin Relay listener started. Also ready to receive Grin at {}",
+			self.name.bright_green()
+		);
 	}
 
 	fn on_slate(

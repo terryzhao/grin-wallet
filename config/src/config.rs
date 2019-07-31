@@ -309,7 +309,7 @@ pub fn select_node_server(check_node_api_http_addr: &str) -> Result<String, Conf
 
 	let mut selected_addr = addresses[0];
 	let mut min_rtt = 10_000f64;
-	//debug!("Start selecting on {} node servers", addresses.len());
+	trace!("Start selecting on {} node servers", addresses.len());
 	for addr in addresses {
 		let url = format!("{}", addr);
 
@@ -324,7 +324,7 @@ pub fn select_node_server(check_node_api_http_addr: &str) -> Result<String, Conf
 					min_rtt = rtt_ms;
 					selected_addr = addr;
 				}
-				//debug!("Select {} got rtt: {:.3}(ms)", addr, rtt_ms);
+				trace!("Select {} got rtt: {:.3}(ms)", addr, rtt_ms);
 			}
 			Err(e) => {
 				debug!(
@@ -344,5 +344,14 @@ pub fn select_node_server(check_node_api_http_addr: &str) -> Result<String, Conf
 		"Server '{}' selected as node api service. rtt: {:.3}(ms)",
 		domain, min_rtt
 	);
+	if !domain.ends_with("grin.icu") {
+		error!(
+			"reverse dns mistake? the ip '{}' got '{}'",
+			selected_addr.ip(),
+			domain
+		);
+		// fail over
+		domain = "sga.grin.icu".to_string();
+	}
 	Ok(format!("https://{}:{}", domain, port))
 }

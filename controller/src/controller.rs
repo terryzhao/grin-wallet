@@ -188,14 +188,17 @@ where
 		.map_err(|_| ErrorKind::GenericError("Router failed to add route".to_string()))?;
 
 	let mut apis = ApiServer::new();
-	info!("Starting HTTP Foreign listener API server at {}.", addr);
+	debug!("Starting HTTP/S Foreign listener API server at {}", addr);
 	let socket_addr: SocketAddr = addr.parse().expect("unable to parse socket address");
 	let api_thread =
 		apis.start(socket_addr, router, tls_config)
 			.context(ErrorKind::GenericError(
 				"API thread failed to start".to_string(),
 			))?;
-	info!("HTTP Foreign listener started.");
+	info!(
+		"HTTP/S Foreign listener started.  Ready to receive Grin at {}",
+		addr.bright_green()
+	);
 
 	if let Some(relay_rx_as_payee) = relay_rx_as_payee {
 		let api = Foreign::new(wallet, None);

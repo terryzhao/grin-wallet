@@ -15,6 +15,7 @@
 //! Grin Relay Service
 
 use chrono::prelude::Utc;
+use dns_lookup::lookup_addr;
 use std::net::ToSocketAddrs;
 use std::net::{SocketAddr, TcpStream};
 use std::sync::Arc;
@@ -126,7 +127,12 @@ impl Subscriber for GrinboxSubscriber {
 	where
 		P: Publisher,
 	{
-		let _ = self.broker.select_server(&self.address);
+		match select_relay_server(&self.address) {
+			Ok(selected_server) => self.broker.selected_server = Some(selected_server),
+			Err(e) => {
+				error!("select_relay_server fail for {}", e);
+			}
+		}
 
 		debug!("Subscriber start on address: {}", self.address.stripped());
 		self.broker
@@ -147,7 +153,7 @@ impl Subscriber for GrinboxSubscriber {
 struct GrinboxBroker {
 	inner: Arc<Mutex<Option<Sender>>>,
 	protocol_unsecure: bool,
-	pub selected_server: Option<SocketAddr>,
+	pub selected_server: Option<String>,
 }
 
 struct ConnectionMetadata {
@@ -210,61 +216,6 @@ impl GrinboxBroker {
 		}
 	}
 
-	// todo: move this 'select' logic into 'subscribe' function,
-	// so as to have selection for each failure and retrying case.
-	fn select_server(&mut self, address: &GrinboxAddress) -> Result<SocketAddr> {
-		const NANO_TO_MILLIS: f64 = 1.0 / 1_000_000.0;
-
-		let cloned_address = address.clone();
-		let mut addresses: Vec<SocketAddr> = vec![];
-		let addrs = (cloned_address.domain.as_str(), 0).to_socket_addrs()?;
-		addresses.append(
-			&mut (addrs
-				.map(|mut addr| {
-					addr.set_port(cloned_address.port() + 1);
-					addr
-				})
-				.collect()),
-		);
-
-		let mut selected_addr = addresses[0];
-		let mut min_rtt = 10_000f64;
-		debug!("Start selecting on {} servers", addresses.len());
-		for addr in addresses {
-			let url = format!("{}", addr);
-
-			let start = Utc::now().timestamp_nanos();
-			let stream = TcpStream::connect(url);
-
-			let fin = Utc::now().timestamp_nanos();
-			let rtt_ms = (fin - start) as f64 * NANO_TO_MILLIS;
-			match stream {
-				Ok(_) => {
-					if rtt_ms < min_rtt {
-						min_rtt = rtt_ms;
-						selected_addr = addr;
-					}
-					debug!("Select {} got rtt: {:.3}(ms)", addr, rtt_ms);
-				}
-				Err(e) => {
-					debug!(
-						"Select {} failed on connect! fail on {:.0} seconds for {}",
-						addr,
-						rtt_ms / 1000f64,
-						e,
-					);
-				}
-			}
-		}
-
-		selected_addr.set_port(cloned_address.port());
-		//todo: reverse dns to switch the ip address into domain again, for redundancy
-
-		debug!("Server {} selected. rtt: {:.3}(ms)", selected_addr, min_rtt);
-		self.selected_server = Some(selected_addr.clone());
-		Ok(selected_addr)
-	}
-
 	fn subscribe<P>(
 		&mut self,
 		address: &GrinboxAddress,
@@ -275,16 +226,16 @@ impl GrinboxBroker {
 		P: Publisher,
 	{
 		let handler = Arc::new(Mutex::new(handler));
-		let url = if let Some(selected_server) = self.selected_server {
+		let url = if let Some(ref selected_server) = self.selected_server {
 			match self.protocol_unsecure {
 				true => format!("ws://{}", selected_server),
 				false => format!("wss://{}", selected_server),
 			}
 		} else {
-			let cloned_address = address.clone();
+			let relay_servers = address.clone();
 			match self.protocol_unsecure {
-				true => format!("ws://{}:{}", cloned_address.domain, cloned_address.port(),),
-				false => format!("wss://{}:{}", cloned_address.domain, cloned_address.port(),),
+				true => format!("ws://{}:{}", relay_servers.domain, relay_servers.port(),),
+				false => format!("wss://{}:{}", relay_servers.domain, relay_servers.port(),),
 			}
 		};
 		debug!("subscribe into {}", url);
@@ -355,6 +306,71 @@ impl GrinboxBroker {
 		let guard = self.inner.lock();
 		guard.is_some()
 	}
+}
+
+/// An util function for relay server selection
+fn select_relay_server(address: &GrinboxAddress) -> Result<String> {
+	const NANO_TO_MILLIS: f64 = 1.0 / 1_000_000.0;
+
+	let relay_servers = address.clone();
+	let mut addresses: Vec<SocketAddr> = vec![];
+	let addrs = (relay_servers.domain.as_str(), 0).to_socket_addrs()?;
+	addresses.append(
+		&mut (addrs
+			.map(|mut addr| {
+				addr.set_port(relay_servers.port() + 1);
+				addr
+			})
+			.collect()),
+	);
+
+	let mut selected_addr = addresses[0];
+	let mut min_rtt = 10_000f64;
+	trace!("Start selecting on {} servers", addresses.len());
+	for addr in addresses {
+		let url = format!("{}", addr);
+
+		let start = Utc::now().timestamp_nanos();
+		let stream = TcpStream::connect(url);
+
+		let fin = Utc::now().timestamp_nanos();
+		let rtt_ms = (fin - start) as f64 * NANO_TO_MILLIS;
+		match stream {
+			Ok(_) => {
+				if rtt_ms < min_rtt {
+					min_rtt = rtt_ms;
+					selected_addr = addr;
+				}
+				trace!("Select {} got rtt: {:.3}(ms)", addr, rtt_ms);
+			}
+			Err(e) => {
+				debug!(
+					"Select {} failed on connect! fail on {:.0} seconds for {}",
+					addr,
+					rtt_ms / 1000f64,
+					e,
+				);
+			}
+		}
+	}
+
+	// switch back to domain by reverse dns, for https and redundancy features
+	let mut domain = lookup_addr(&selected_addr.ip())?;
+	if !domain.ends_with("grin.icu") {
+		error!(
+			"reverse dns mistake? the ip '{}' got '{}'",
+			selected_addr.ip(),
+			domain
+		);
+		// fail over
+		domain = "sga.grin.icu".to_string();
+	}
+
+	debug!(
+		"Server {} selected as relay service. rtt: {:.3}(ms)",
+		domain, min_rtt
+	);
+	Ok(format!("{}:{}", domain, relay_servers.port()))
 }
 
 struct GrinboxClient<P>
