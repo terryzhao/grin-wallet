@@ -133,6 +133,13 @@ fn comments() -> HashMap<String, String> {
 		.to_string(),
 	);
 	retval.insert(
+		"enable_grinrelay".to_string(),
+		"
+#Whether to enable using the Grin relay service.
+"
+		.to_string(),
+	);
+	retval.insert(
 		"grinrelay_domain".to_string(),
 		"
 #The Grin transaction relay service provider domain.

@@ -108,6 +108,8 @@ impl WalletConfig {
 /// Grin Relay configuration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GrinRelayConfig {
+	/// Whether to enable using the Grin relay
+	pub enable_grinrelay: bool,
 	/// Grin Relay server domain
 	pub grinrelay_domain: String,
 	/// Grin Relay server port
@@ -121,6 +123,7 @@ pub struct GrinRelayConfig {
 impl Default for GrinRelayConfig {
 	fn default() -> GrinRelayConfig {
 		GrinRelayConfig {
+			enable_grinrelay: true,
 			grinrelay_domain: "relay.grin.icu".to_string(),
 			grinrelay_port: 3418,
 			grinrelay_protocol_unsecure: true,

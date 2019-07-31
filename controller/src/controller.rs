@@ -171,7 +171,7 @@ pub fn foreign_listener<T: ?Sized, C, K>(
 	addr: &str,
 	tls_config: Option<TLSConfig>,
 	relay_rx_as_payee: Option<Receiver<(String, Slate)>>,
-	grinrelay_listener: Box<dyn Listener>,
+	grinrelay_listener: Option<Box<dyn Listener>>,
 	account: &str,
 ) -> Result<(), Error>
 where
@@ -202,6 +202,7 @@ where
 
 	if let Some(relay_rx_as_payee) = relay_rx_as_payee {
 		let api = Foreign::new(wallet, None);
+		let grinrelay_listener = grinrelay_listener.unwrap();
 		loop {
 			match relay_rx_as_payee.try_recv() {
 				Ok((addr, slate)) => {

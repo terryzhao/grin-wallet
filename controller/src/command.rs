@@ -144,21 +144,28 @@ pub fn listen(config: &WalletConfig, args: &ListenArgs, g_args: &GlobalArgs) -> 
 				None => None,
 			};
 
-			// The streaming channel between 'grinrelay_listener' and 'foreign_listener'
-			let (relay_tx_as_payee, relay_rx) = channel();
+			let grinrelay_config = config.grinrelay_config.clone().unwrap_or_default();
+			let (relay_rx, grinrelay_listener) = if grinrelay_config.enable_grinrelay {
+				// The streaming channel between 'grinrelay_listener' and 'foreign_listener'
+				let (relay_tx_as_payee, relay_rx) = channel();
 
-			let grinrelay_listener = controller::grinrelay_listener(
-				wallet.clone(),
-				config.grinrelay_config.clone().unwrap_or_default(),
-				None,
-				Some(relay_tx_as_payee),
-			)?;
+				let grinrelay_listener = controller::grinrelay_listener(
+					wallet.clone(),
+					config.grinrelay_config.clone().unwrap_or_default(),
+					None,
+					Some(relay_tx_as_payee),
+				)?;
+
+				(Some(relay_rx), Some(grinrelay_listener))
+			} else {
+				(None, None)
+			};
 
 			controller::foreign_listener(
 				wallet.clone(),
 				&listen_addr,
 				tls_conf,
-				Some(relay_rx),
+				relay_rx,
 				grinrelay_listener,
 				&g_args.account,
 			)?;
