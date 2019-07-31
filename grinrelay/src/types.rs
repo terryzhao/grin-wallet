@@ -102,7 +102,7 @@ where
 						.send((address, slate.clone()));
 				} else {
 					return Err(ErrorKind::GenericError(
-						"relay mspc sender (as payee) missed".to_string(),
+						"relay mpsc sender (as payee) missed".to_string(),
 					)
 					.into());
 				}
@@ -119,10 +119,11 @@ where
 				let _ = self.relay_tx_as_payer.clone().unwrap().send(slate.clone());
 				Ok(())
 			} else {
-				Err(
-					ErrorKind::GenericError("relay mspc sender (as payer) missed".to_string())
-						.into(),
+				debug!("process_incoming_slate: relay mpsc sender (as payer) missed.");
+				Err(ErrorKind::GenericError(
+					"an obsoleted transaction slate received, ignored".to_string(),
 				)
+				.into())
 			}
 		}
 	}
