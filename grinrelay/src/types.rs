@@ -135,7 +135,7 @@ where
 {
 	fn on_open(&self) {
 		info!(
-			"Grin Relay listener started. Also ready to receive Grin at {}",
+			"Grin Relay listener started on addr: {}",
 			self.name.bright_green()
 		);
 	}

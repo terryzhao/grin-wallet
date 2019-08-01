@@ -112,8 +112,16 @@ fn real_main() -> i32 {
 		w.config_file_path.as_ref().unwrap().to_str().unwrap()
 	);
 
-	// Select nearest node server
 	let c = w.members.as_mut().unwrap().wallet.clone();
+	assert!(
+		c.grinrelay_config
+			.clone()
+			.unwrap()
+			.grinrelay_receiving_address_index
+			< 0x7ffffffeu32
+	);
+
+	// Select nearest node server
 	if c.check_node_api_http_addr
 		.starts_with("https://nodes.grin.icu")
 	{

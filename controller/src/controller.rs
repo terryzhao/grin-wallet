@@ -31,6 +31,7 @@ use futures::future::{err, ok};
 use futures::{Future, Stream};
 use hyper::header::HeaderValue;
 use hyper::{Body, Request, Response, StatusCode};
+use rand::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::marker::PhantomData;
@@ -256,13 +257,13 @@ where
 	C: NodeClient + 'static,
 	K: Keychain + 'static,
 {
-	let index = grinrelay_config.grinrelay_address_index;
+	let index = grinrelay_config.grinrelay_receiving_address_index;
 
 	let pub_key = {
 		let mut w = wallet.lock();
 		w.open_with_credentials()?;
 		let keychain = w.keychain();
-		let sec_key = derive_address_key(keychain, index)?;
+		let sec_key = derive_address_key(keychain, 0, index)?;
 		PublicKey::from_secret_key(keychain.secp(), &sec_key)?
 	};
 
@@ -287,13 +288,38 @@ where
 	C: NodeClient + 'static,
 	K: Keychain + 'static,
 {
-	let index = grinrelay_config.grinrelay_address_index;
+	let mut index: u32;
+	let mut path: u32 = 0;
+	if relay_tx_as_payee.is_some() {
+		// for Grin receiving listener
+		index = grinrelay_config.grinrelay_receiving_address_index;
+	} else {
+		// for Grin sending listener
+		if grinrelay_config.grinrelay_sending_address_random {
+			let mut rng = rand::thread_rng();
+			index = rng.gen_range(0, 0x7fffffffu32);
+			if index == grinrelay_config.grinrelay_receiving_address_index {
+				index = rng.gen_range(0, 0x7fffffffu32);
+			}
+			path = rng.gen_range(0, 0x7fffffffu32);
+			info!(
+				"Random address (index: {}, path: {}) generated for this wallet sending",
+				index.to_string().bright_green(),
+				path.to_string().bright_green(),
+			);
+		} else {
+			index = grinrelay_config.grinrelay_receiving_address_index + 1;
+			if index == std::u32::MAX {
+				index = 0;
+			}
+		}
+	}
 
 	let (sec_key, pub_key) = {
 		let mut w = wallet.lock();
 		w.open_with_credentials()?;
 		let keychain = w.keychain();
-		let sec_key = derive_address_key(keychain, index)?;
+		let sec_key = derive_address_key(keychain, path, index)?;
 		let pub_key = PublicKey::from_secret_key(keychain.secp(), &sec_key)?;
 		(sec_key, pub_key)
 	};

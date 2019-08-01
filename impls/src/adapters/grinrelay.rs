@@ -17,12 +17,13 @@ use crate::config::WalletConfig;
 use crate::libwallet::Listener;
 use crate::libwallet::{Error, ErrorKind, Slate, SlateVersion, VersionedSlate};
 use crate::WalletCommAdapter;
+use colored::*;
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::thread;
 use std::time::Duration;
 
-const TTL: u16 = 5; // TODO: Pass this as a parameter
+const TTL: u16 = 10; // TODO: Pass this as a parameter
 
 pub struct GrinrelayWalletCommAdapter {
 	listener: Box<dyn Listener>,
@@ -53,6 +54,7 @@ impl WalletCommAdapter for GrinrelayWalletCommAdapter {
 		self.listener.publish(&versioned_slate, &dest.to_owned())?;
 
 		// Wait for response from recipient via Grin Relay
+		info!("Waiting for recipient to response ...");
 		let mut cnt = 0;
 		loop {
 			match self.relay_rx.try_recv() {
@@ -68,9 +70,11 @@ impl WalletCommAdapter for GrinrelayWalletCommAdapter {
 			}
 			cnt += 1;
 			if cnt > TTL * 10 {
-				return Err(ErrorKind::ClientCallback(
-					"Receiving reply from recipient".to_owned(),
-				))?;
+				return Err(ErrorKind::ClientCallback(format!(
+					"{} from recipient. {}s timeout",
+					"No response".bright_blue(),
+					TTL
+				)))?;
 			}
 			thread::sleep(Duration::from_millis(100));
 		}

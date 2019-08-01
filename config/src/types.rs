@@ -116,8 +116,10 @@ pub struct GrinRelayConfig {
 	pub grinrelay_port: u16,
 	/// Grin Relay use ws or wss
 	pub grinrelay_protocol_unsecure: bool,
-	/// Grin Relay address index
-	pub grinrelay_address_index: u32,
+	/// Grin Relay receiving address index
+	pub grinrelay_receiving_address_index: u32,
+	/// Whether to use random address for Grin Relay sending
+	pub grinrelay_sending_address_random: bool,
 }
 
 impl Default for GrinRelayConfig {
@@ -127,7 +129,8 @@ impl Default for GrinRelayConfig {
 			grinrelay_domain: "relay.grin.icu".to_string(),
 			grinrelay_port: 3418,
 			grinrelay_protocol_unsecure: true,
-			grinrelay_address_index: 0,
+			grinrelay_receiving_address_index: 0,
+			grinrelay_sending_address_random: true,
 		}
 	}
 }

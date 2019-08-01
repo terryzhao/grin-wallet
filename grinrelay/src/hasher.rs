@@ -46,18 +46,18 @@ impl BIP32GrinboxHasher {
 impl BIP32Hasher for BIP32GrinboxHasher {
 	fn network_priv(&self) -> [u8; 4] {
 		match self.is_floo {
-			true => [42, 0, 0, 42],
-			false => [42, 1, 0, 42],
+			true => [71, 3, 0, 71],
+			false => [71, 9, 0, 71],
 		}
 	}
 	fn network_pub(&self) -> [u8; 4] {
 		match self.is_floo {
-			true => [42, 0, 1, 42],
-			false => [42, 1, 1, 42],
+			true => [71, 3, 1, 71],
+			false => [71, 9, 1, 71],
 		}
 	}
 	fn master_seed() -> [u8; 12] {
-		b"Grinbox_seed".to_owned()
+		b"GrinHasRelay".to_owned()
 	}
 	fn init_sha512(&mut self, seed: &[u8]) {
 		self.hmac_sha512 = HmacSha512::new_varkey(seed).expect("HMAC can take key of any size");;
@@ -86,12 +86,15 @@ impl BIP32Hasher for BIP32GrinboxHasher {
 	}
 }
 
-pub fn derive_address_key<K: Keychain>(keychain: &K, index: u32) -> Result<SecretKey> {
-	let root = keychain.derive_key(713, &K::root_key_id(), &SwitchCommitmentType::None)?;
+pub fn derive_address_key<K: Keychain>(keychain: &K, path: u32, index: u32) -> Result<SecretKey> {
+	let root = keychain.derive_key(7139, &K::root_key_id(), &SwitchCommitmentType::None)?;
 	let mut hasher = BIP32GrinboxHasher::new(is_floonet());
 	let secp = keychain.secp();
 	let master = ExtendedPrivKey::new_master(secp, &mut hasher, &root.0)?;
-	Ok(master
+	let mut ext_key = master;
+	// Depth 2 for Grin Relay address derivation
+	ext_key = ext_key.ckd_priv(secp, &mut hasher, ChildNumber::from_normal_idx(path))?;
+	Ok(ext_key
 		.ckd_priv(secp, &mut hasher, ChildNumber::from_normal_idx(index))?
 		.secret_key)
 }

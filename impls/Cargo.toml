@@ -11,6 +11,7 @@ edition = "2018"
 
 [dependencies]
 blake2-rfc = "0.2"
+colored = "1.6"
 failure = "0.1"
 failure_derive = "0.1"
 futures = "0.1"

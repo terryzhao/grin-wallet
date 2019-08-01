@@ -161,9 +161,16 @@ fn comments() -> HashMap<String, String> {
 		.to_string(),
 	);
 	retval.insert(
-		"grinrelay_address_index".to_string(),
+		"grinrelay_receiving_address_index".to_string(),
 		"
-#Which Grin Relay address to use. Choose any value within [0, 2^31 - 1]
+#Which Grin Relay address to use for receiving. Choose any value within [0, 2^31 - 2]
+"
+		.to_string(),
+	);
+	retval.insert(
+		"grinrelay_sending_address_random".to_string(),
+		"
+#Whether to use random address for Grin Relay sending. If 'false', use above index+1
 "
 		.to_string(),
 	);
