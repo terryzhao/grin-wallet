@@ -546,6 +546,7 @@ where
 			&slate,
 			dest_acct_name.as_ref().map(String::as_str),
 			message,
+			None,
 		)
 		.map_err(|e| e.kind())?;
 		Ok(VersionedSlate::into_version(slate, version))

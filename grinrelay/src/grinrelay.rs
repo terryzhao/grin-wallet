@@ -36,8 +36,9 @@ use crate::crypto::{sign_challenge, Hex};
 use crate::error::ErrorKind;
 use crate::grin_util::secp::key::SecretKey;
 use crate::grin_util::Mutex;
+use crate::libwallet::TxProof;
 use crate::protocol::{ProtocolRequest, ProtocolResponse};
-use crate::tx_proof::TxProof;
+use crate::tx_proof::TxProofImpl;
 use crate::types::{CloseReason, Controller, Publisher, Subscriber, SubscriptionHandler};
 use crate::Result;
 
@@ -450,13 +451,13 @@ where
 				challenge,
 				signature,
 			} => {
-				let (slate, mut tx_proof) = match TxProof::from_response(
-					from,
+				let (slate, tx_proof) = match TxProof::from_response(
+					from.clone(),
 					str,
 					challenge,
 					signature,
 					&self.secret_key,
-					Some(&self.address),
+					self.address.stripped(),
 				) {
 					Ok(x) => x,
 					Err(e) => {
@@ -465,10 +466,7 @@ where
 					}
 				};
 
-				let address = tx_proof.address.clone();
-				self.handler
-					.lock()
-					.on_slate(&address, &slate, Some(&mut tx_proof));
+				self.handler.lock().on_slate(&from, &slate, Some(tx_proof));
 			}
 			ProtocolResponse::Error {
 				kind: _,

@@ -16,19 +16,25 @@
 
 use crate::util::{Mutex, ZeroingString};
 use chrono::prelude::*;
+use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::core::core::Transaction;
+use crate::grinrelay::hasher::derive_address_key;
+use crate::grinrelay::{sign_challenge, GrinboxAddress, TxProofImpl};
 use crate::impls::{HTTPWalletCommAdapter, KeybaseWalletCommAdapter, WalletSeed};
 use crate::keychain::{Identifier, Keychain};
 use crate::libwallet::api_impl::owner;
 use crate::libwallet::{
 	AcctPathMapping, Error, ErrorKind, InitTxArgs, IssueInvoiceTxArgs, NodeClient,
-	NodeHeightResult, OutputCommitMapping, PaymentCommitMapping, Slate, TxLogEntry, WalletBackend,
-	WalletInfo,
+	NodeHeightResult, OutputCommitMapping, PaymentCommitMapping, Slate, TxLogEntry, TxProof,
+	TxProofVerified, WalletBackend, WalletInfo,
 };
+use crate::util::secp::key::PublicKey;
+use crate::util::secp::pedersen::Commitment;
+use crate::util::static_secp_instance;
 
 /// Main interface into all wallet API functions.
 /// Wallet APIs are split into two seperate blocks of functionality
@@ -551,11 +557,15 @@ where
 			Some(sa) => {
 				match sa.method.as_ref() {
 					"http" => {
-						slate = HTTPWalletCommAdapter::new().send_tx_sync(&sa.dest, &slate)?
+						let adapter = HTTPWalletCommAdapter::new();
+						let res = adapter.send_tx_sync(&sa.dest, &slate)?;
+						slate = res.0;
 					}
 					"keybase" => {
 						//TODO: in case of keybase, the response might take 60s and leave the service hanging
-						slate = KeybaseWalletCommAdapter::new().send_tx_sync(&sa.dest, &slate)?;
+						let adapter = KeybaseWalletCommAdapter::new();
+						let res = adapter.send_tx_sync(&sa.dest, &slate)?;
+						slate = res.0;
 					}
 					_ => {
 						error!("unsupported payment method: {}", sa.method);
@@ -563,10 +573,10 @@ where
 							"unsupported payment method".to_owned(),
 						))?;
 					}
-				}
+				};
 				self.tx_lock_outputs(&slate, 0)?;
 				let slate = match sa.finalize {
-					true => self.finalize_tx(&slate)?,
+					true => self.finalize_tx(&slate, None, None)?,
 					false => slate,
 				};
 
@@ -758,6 +768,11 @@ where
 	/// participants must have filled in both rounds, and the sender should have locked their
 	/// outputs (via the [`tx_lock_outputs`](struct.Owner.html#method.tx_lock_outputs) function).
 	///
+	/// * `tx_proof` - The transaction [`TxProof`](../grin_wallet_libwallet/types/struct.TxProof.html). The
+	/// transaction proof when using Grin Relay transaction method.
+	///
+	/// * `grinrelay_key_path` - The key path|index for Grin Relay sending address.
+	///
 	/// # Returns
 	/// * ``Ok([`slate`](../grin_wallet_libwallet/slate/struct.Slate.html))` if successful,
 	/// containing the new finalized slate.
@@ -791,15 +806,20 @@ where
 	///		//
 	///		// Retrieve slate back from recipient
 	///		//
-	///		let res = api_owner.finalize_tx(&slate);
+	///		let res = api_owner.finalize_tx(&slate, None, None);
 	/// }
 	/// ```
 
-	pub fn finalize_tx(&self, slate: &Slate) -> Result<Slate, Error> {
+	pub fn finalize_tx(
+		&self,
+		slate: &Slate,
+		tx_proof: Option<TxProof>,
+		grinrelay_key_path: Option<u64>,
+	) -> Result<Slate, Error> {
 		let mut w = self.wallet.lock();
 		let mut slate = slate.clone();
 		w.open_with_credentials()?;
-		slate = owner::finalize_tx(&mut *w, &slate)?;
+		slate = owner::finalize_tx(&mut *w, &slate, tx_proof, grinrelay_key_path)?;
 		w.close()?;
 		Ok(slate)
 	}
@@ -848,7 +868,7 @@ where
 	///		//
 	///		// Retrieve slate back from recipient
 	///		//
-	///		let res = api_owner.finalize_tx(&slate);
+	///		let res = api_owner.finalize_tx(&slate, None, None);
 	///		let res = api_owner.post_tx(&slate.tx, true);
 	/// }
 	/// ```
@@ -956,6 +976,154 @@ where
 	pub fn get_stored_tx(&self, tx_log_entry: &TxLogEntry) -> Result<Option<Transaction>, Error> {
 		let w = self.wallet.lock();
 		owner::get_stored_tx(&*w, tx_log_entry)
+	}
+
+	/// Retrieves a stored transaction proof.
+	pub fn get_stored_tx_proof(
+		&self,
+		tx_id: Option<u32>,
+		tx_slate_id: Option<Uuid>,
+	) -> Result<Option<TxProof>, Error> {
+		let mut w = self.wallet.lock();
+		//Note: no need to open if 'refresh_from_node' is false in 'retrieve_txs'
+		//w.open_with_credentials()?;
+		owner::get_stored_tx_proof(&mut *w, tx_id, tx_slate_id)
+	}
+
+	/// Verifies a transaction proof and returns relevant information
+	pub fn verify_tx_proof(&self, tx_proof: &TxProof) -> Result<TxProofVerified, Error> {
+		// Check signature on the message
+		let slate = tx_proof.verify_extract(String::new())?;
+
+		// Inputs owned by sender
+		let inputs_ex = tx_proof.inputs.iter().collect::<HashSet<_>>();
+
+		let slate: Slate = slate.into();
+
+		// Select inputs owned by the receiver (usually none)
+		let mut inputs: Vec<Commitment> = slate
+			.tx
+			.inputs()
+			.iter()
+			.map(|i| i.commitment())
+			.filter(|c| !inputs_ex.contains(c))
+			.collect();
+
+		// Outputs owned by sender
+		let outputs_ex = tx_proof.outputs.iter().collect::<HashSet<_>>();
+
+		// Select outputs owned by the receiver
+		let outputs: Vec<Commitment> = slate
+			.tx
+			.outputs()
+			.iter()
+			.map(|o| o.commitment())
+			.filter(|c| !outputs_ex.contains(c))
+			.collect();
+
+		// Receiver's excess
+		let excess = &slate.participant_data[1].public_blind_excess;
+
+		let secp = static_secp_instance();
+		let secp = secp.lock();
+
+		// Calculate receiver's excess from their inputs and inputs
+		let commit_amount = secp.commit_value(tx_proof.amount)?;
+		inputs.push(commit_amount);
+
+		let commit_excess = secp.commit_sum(outputs.clone(), inputs)?;
+		let pubkey_excess = commit_excess.to_pubkey(&secp)?;
+
+		// Verify receiver's excess with their inputs and outputs
+		if excess != &pubkey_excess {
+			return Err(ErrorKind::VerifyProof(
+				"Verify receiver's excess with their inputs and outputs".to_string(),
+			)
+			.into());
+		}
+
+		// Calculate kernel excess from inputs and outputs
+		let excess_parts: Vec<&PublicKey> = slate
+			.participant_data
+			.iter()
+			.map(|p| &p.public_blind_excess)
+			.collect();
+		let excess_sum = PublicKey::from_combination(&secp, excess_parts)?;
+
+		let mut input_com: Vec<Commitment> =
+			slate.tx.inputs().iter().map(|i| i.commitment()).collect();
+
+		let mut output_com: Vec<Commitment> =
+			slate.tx.outputs().iter().map(|o| o.commitment()).collect();
+
+		input_com.push(secp.commit(0, slate.tx.offset.secret_key(&secp)?)?);
+
+		output_com.push(secp.commit_value(slate.fee)?);
+
+		let excess_sum_com = secp.commit_sum(output_com, input_com)?;
+
+		// Verify kernel excess with all inputs and outputs
+		if excess_sum_com.to_pubkey(&secp)? != excess_sum {
+			return Err(ErrorKind::VerifyProof(
+				"Verify kernel excess with all inputs and outputs".to_string(),
+			)
+			.into());
+		}
+
+		return Ok(TxProofVerified {
+			sender: tx_proof.sender_address.clone(),
+			receiver: tx_proof.recipient_address.clone(),
+			amount: tx_proof.amount,
+			outputs,
+			excess: excess_sum_com,
+		});
+	}
+
+	/// Sign a transaction proof and update relevant information: prover_msg, prover_signature
+	pub fn sign_tx_proof(
+		&self,
+		grinrelay_key_path: u64,
+		tx_proof: &mut TxProof,
+	) -> Result<(), Error> {
+		let message = if let Some(ref msg) = tx_proof.prover_msg {
+			msg.clone()
+		} else {
+			return Err(ErrorKind::SignProof("no message for sign".to_string()).into());
+		};
+
+		let index = grinrelay_key_path as u32;
+		let path = (grinrelay_key_path >> 32) as u32;
+		info!(
+			"signing TxProof with GrinRelay address (index: {}, path: {})",
+			index.to_string(),
+			path.to_string(),
+		);
+
+		let (sec_key, pub_key) = {
+			let mut w = self.wallet.lock();
+			w.open_with_credentials()?;
+			let keychain = w.keychain();
+			let sec_key = derive_address_key(keychain, path, index)?;
+			let pub_key = PublicKey::from_secret_key(keychain.secp(), &sec_key)?;
+			(sec_key, pub_key)
+		};
+
+		let self_address = GrinboxAddress::from_str(tx_proof.sender_address.as_str())
+			.map_err(|_| ErrorKind::SignProof("address parse error".to_string()))?;
+
+		if pub_key != self_address.public_key()? {
+			return Err(ErrorKind::SignProof(
+				"PublicKey not match. Is this your TxProof?".to_string(),
+			)
+			.into());
+		}
+
+		tx_proof.prover_signature = Some(
+			sign_challenge(&message, &sec_key)
+				.map_err(|_| ErrorKind::SignProof("signature failure".to_string()))?,
+		);
+
+		Ok(())
 	}
 
 	/// Verifies all messages in the slate match their public keys.

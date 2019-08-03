@@ -16,7 +16,7 @@
 
 use crate::config::WalletConfig;
 use crate::libwallet::api_impl::foreign;
-use crate::libwallet::{Error, ErrorKind, Slate};
+use crate::libwallet::{Error, ErrorKind, Slate, TxProof};
 use crate::{instantiate_wallet, HTTPNodeClient, WalletCommAdapter};
 use failure::ResultExt;
 use serde::Serialize;
@@ -286,7 +286,7 @@ impl WalletCommAdapter for KeybaseWalletCommAdapter {
 	}
 
 	// Send a slate to a keybase username then wait for a response for TTL seconds.
-	fn send_tx_sync(&self, addr: &str, slate: &Slate) -> Result<Slate, Error> {
+	fn send_tx_sync(&self, addr: &str, slate: &Slate) -> Result<(Slate, Option<TxProof>), Error> {
 		// Limit only one recipient
 		if addr.matches(",").count() > 0 {
 			error!("Only one recipient is supported!");
@@ -307,7 +307,7 @@ impl WalletCommAdapter for KeybaseWalletCommAdapter {
 		info!("tx request has been sent to @{}, tx uuid: {}", addr, id);
 		// Wait for response from recipient with SLATE_SIGNED topic
 		match poll(TTL as u64, addr) {
-			Some(slate) => return Ok(slate),
+			Some(slate) => return Ok((slate, None)),
 			None => {
 				return Err(ErrorKind::ClientCallback(
 					"Receiving reply from recipient".to_owned(),
@@ -381,7 +381,7 @@ impl WalletCommAdapter for KeybaseWalletCommAdapter {
 						let res = {
 							let mut w = wallet.lock();
 							w.open_with_credentials()?;
-							let r = foreign::receive_tx(&mut *w, &slate, None, None, false);
+							let r = foreign::receive_tx(&mut *w, &slate, None, None, None, false);
 							w.close()?;
 							r
 						};

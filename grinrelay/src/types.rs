@@ -18,8 +18,8 @@ use colored::*;
 
 use crate::grin_core::core::amount_to_hr_string;
 use crate::grinrelay_address::GrinboxAddress;
+use crate::libwallet::TxProof;
 use crate::libwallet::{Slate, VersionedSlate};
-use crate::tx_proof::TxProof;
 use crate::ErrorKind;
 use crate::Result;
 use std::sync::mpsc::Sender;
@@ -43,7 +43,7 @@ pub trait Subscriber {
 
 pub trait SubscriptionHandler: Send {
 	fn on_open(&self);
-	fn on_slate(&self, from: &GrinboxAddress, slate: &VersionedSlate, proof: Option<&mut TxProof>);
+	fn on_slate(&self, from: &str, slate: &VersionedSlate, proof: Option<TxProof>);
 	fn on_close(&self, result: CloseReason);
 	fn on_dropped(&self);
 	fn on_reestablished(&self);
@@ -56,7 +56,7 @@ where
 {
 	name: String,
 	publisher: P,
-	relay_tx_as_payer: Option<Sender<Slate>>,
+	relay_tx_as_payer: Option<Sender<(Slate, Option<TxProof>)>>,
 	relay_tx_as_payee: Option<Sender<(String, Slate)>>,
 }
 
@@ -67,7 +67,7 @@ where
 	pub fn new(
 		name: &str,
 		publisher: P,
-		relay_tx_as_payer: Option<Sender<Slate>>,
+		relay_tx_as_payer: Option<Sender<(Slate, Option<TxProof>)>>,
 		relay_tx_as_payee: Option<Sender<(String, Slate)>>,
 	) -> Result<Self> {
 		Ok(Self {
@@ -82,12 +82,13 @@ where
 		&self,
 		address: String,
 		slate: &mut Slate,
-		_tx_proof: Option<&mut TxProof>,
+		tx_proof: Option<TxProof>,
 	) -> Result<()> {
 		if slate.num_participants > slate.participant_data.len() {
 			if slate.tx.inputs().len() == 0 {
 				// TODO: invoicing
 			} else {
+				// as transaction recipient
 				debug!(
 					"process_incoming_slate: slate [{}] received from {}",
 					slate.id.to_string().bright_green(),
@@ -109,6 +110,7 @@ where
 			}
 			Ok(())
 		} else {
+			// as transaction sender/payer
 			debug!(
 				"process_incoming_slate: slate [{}] received from {}",
 				slate.id.to_string().bright_green(),
@@ -116,7 +118,11 @@ where
 			);
 			//self.owner.finalize_tx(slate, tx_proof)?;
 			if self.relay_tx_as_payer.is_some() {
-				let _ = self.relay_tx_as_payer.clone().unwrap().send(slate.clone());
+				let _ = self
+					.relay_tx_as_payer
+					.clone()
+					.unwrap()
+					.send((slate.clone(), tx_proof));
 				Ok(())
 			} else {
 				debug!("process_incoming_slate: relay mpsc sender (as payer) missed.");
@@ -140,33 +146,26 @@ where
 		);
 	}
 
-	fn on_slate(
-		&self,
-		from: &GrinboxAddress,
-		slate: &VersionedSlate,
-		tx_proof: Option<&mut TxProof>,
-	) {
+	fn on_slate(&self, from: &str, slate: &VersionedSlate, tx_proof: Option<TxProof>) {
 		let mut slate: Slate = slate.clone().into();
 
 		if slate.num_participants > slate.participant_data.len() {
 			info!(
 				"Slate [{}] received from [{}] for [{}] grins",
 				slate.id.to_string().bright_green(),
-				from.stripped().bright_green(),
+				from.bright_green(),
 				amount_to_hr_string(slate.amount, true).bright_green(),
 			);
 		} else {
 			info!(
 				"Slate [{}] received back from [{}] for [{}] grins",
 				slate.id.to_string().bright_green(),
-				from.stripped().bright_green(),
+				from.bright_green(),
 				amount_to_hr_string(slate.amount, true).bright_green(),
 			);
 		};
 
-		GrinboxAddress::from_str(&from.to_string()).expect("invalid grinrelay address");
-
-		let result = self.process_incoming_slate(from.stripped(), &mut slate, tx_proof);
+		let result = self.process_incoming_slate(from.to_owned(), &mut slate, tx_proof);
 
 		match result {
 			Ok(_) => {}

@@ -229,6 +229,7 @@ pub trait OwnerRpc {
 			  "confirmed": true,
 			  "creation_ts": "2019-01-15T16:01:26Z",
 			  "fee": null,
+			  "grinrelay_key_path": null,
 			  "id": 0,
 			  "messages": null,
 			  "num_inputs": 0,
@@ -245,6 +246,7 @@ pub trait OwnerRpc {
 			  "confirmed": true,
 			  "creation_ts": "2019-01-15T16:01:26Z",
 			  "fee": null,
+			  "grinrelay_key_path": null,
 			  "id": 1,
 			  "messages": null,
 			  "num_inputs": 0,
@@ -989,6 +991,7 @@ pub trait OwnerRpc {
 				"confirmed": false,
 				"creation_ts": "2019-01-15T16:01:26Z",
 				"fee": "7000000",
+				"grinrelay_key_path": null,
 				"id": 5,
 				"messages": {
 					"messages": [
@@ -1293,7 +1296,7 @@ where
 	}
 
 	fn finalize_tx(&self, mut slate: Slate) -> Result<Slate, ErrorKind> {
-		Owner::finalize_tx(self, &mut slate).map_err(|e| e.kind())
+		Owner::finalize_tx(self, &mut slate, None, None).map_err(|e| e.kind())
 	}
 
 	fn tx_lock_outputs(&self, mut slate: Slate, participant_id: usize) -> Result<(), ErrorKind> {
@@ -1417,7 +1420,8 @@ pub fn run_doctest_owner(
 		{
 			let mut w2 = wallet2.lock();
 			w2.open_with_credentials().unwrap();
-			slate = api_impl::foreign::receive_tx(&mut *w2, &slate, None, None, true).unwrap();
+			slate =
+				api_impl::foreign::receive_tx(&mut *w2, &slate, None, None, None, true).unwrap();
 			w2.close().unwrap();
 		}
 		// Spit out slate for input to finalize_tx
@@ -1427,7 +1431,7 @@ pub fn run_doctest_owner(
 		println!("RECEIPIENT SLATE");
 		println!("{}", serde_json::to_string_pretty(&slate).unwrap());
 		if finalize_tx {
-			slate = api_impl::owner::finalize_tx(&mut *w, &slate).unwrap();
+			slate = api_impl::owner::finalize_tx(&mut *w, &slate, None, None).unwrap();
 			error!("FINALIZED TX SLATE");
 			println!("{}", serde_json::to_string_pretty(&slate).unwrap());
 		}

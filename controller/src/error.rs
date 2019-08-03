@@ -104,6 +104,15 @@ pub enum ErrorKind {
 	#[fail(display = "{}", _0)]
 	ArgumentError(String),
 
+	#[fail(display = "{}", 0)]
+	Usage(String),
+
+	#[fail(display = "Argument '{}' required", 0)]
+	Argument(String),
+
+	#[fail(display = "Unable to parse number '{}'", 0)]
+	ParseNumber(String),
+
 	/// Other
 	#[fail(display = "Generic error: {}", _0)]
 	GenericError(String),

@@ -29,7 +29,7 @@ use crate::Result;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct EncryptedMessage {
 	pub destination: GrinboxAddress,
-	encrypted_message: String,
+	pub encrypted_message: String,
 	salt: String,
 	nonce: String,
 }
@@ -100,5 +100,46 @@ impl EncryptedMessage {
 				.map_err(|_| ErrorKind::Decryption)?;
 
 		String::from_utf8(decrypted_data.to_vec()).map_err(|_| ErrorKind::Decryption.into())
+	}
+
+	pub fn get_decrypted_message(&self, key: &[u8; 32]) -> Result<DecryptedMessage> {
+		Ok(DecryptedMessage {
+			destination: self.destination.clone(),
+			message: self.decrypt_with_key(key)?,
+			salt: self.salt.clone(),
+			nonce: self.nonce.clone(),
+		})
+	}
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DecryptedMessage {
+	pub destination: GrinboxAddress,
+	pub message: String,
+	pub salt: String,
+	pub nonce: String,
+}
+
+impl DecryptedMessage {
+	pub fn encrypt_with_key(&self, key: &[u8; 32]) -> Result<EncryptedMessage> {
+		let mut enc_bytes = self.message.as_bytes().to_vec();
+		let suffix_len = aead::CHACHA20_POLY1305.tag_len();
+		for _ in 0..suffix_len {
+			enc_bytes.push(0);
+		}
+		let sealing_key = aead::SealingKey::new(&aead::CHACHA20_POLY1305, key)
+			.map_err(|_| ErrorKind::Encryption)?;
+
+		let nonce = from_hex(self.nonce.clone()).map_err(|_| ErrorKind::Encryption)?;
+		aead::seal_in_place(&sealing_key, &nonce, &[], &mut enc_bytes, suffix_len)
+			.map_err(|_| ErrorKind::Encryption)?;
+
+		let encrypted_message = to_hex(enc_bytes);
+		Ok(EncryptedMessage {
+			destination: self.destination.clone(),
+			encrypted_message,
+			salt: self.salt.clone(),
+			nonce: self.nonce.clone(),
+		})
 	}
 }

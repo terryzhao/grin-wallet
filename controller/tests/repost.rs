@@ -132,7 +132,7 @@ fn file_repost_test_impl(test_dir: &str) -> Result<(), libwallet::Error> {
 	wallet::controller::foreign_single_use(wallet1.clone(), |api| {
 		let adapter = FileWalletCommAdapter::new();
 		slate = adapter.receive_tx_async(&send_file)?;
-		slate = api.receive_tx(&slate, None, None)?;
+		slate = api.receive_tx(&slate, None, None, None)?;
 		adapter.send_tx_async(&receive_file, &mut slate)?;
 		Ok(())
 	})?;
@@ -147,7 +147,7 @@ fn file_repost_test_impl(test_dir: &str) -> Result<(), libwallet::Error> {
 	wallet::controller::owner_single_use(wallet1.clone(), |api| {
 		let adapter = FileWalletCommAdapter::new();
 		slate = adapter.receive_tx_async(&receive_file)?;
-		slate = api.finalize_tx(&slate)?;
+		slate = api.finalize_tx(&slate, None, None)?;
 		Ok(())
 	})?;
 
@@ -212,7 +212,7 @@ fn file_repost_test_impl(test_dir: &str) -> Result<(), libwallet::Error> {
 		let slate_i = sender_api.init_send_tx(args)?;
 		slate = client1.send_tx_slate_direct("wallet2", &slate_i)?;
 		sender_api.tx_lock_outputs(&slate, 0)?;
-		slate = sender_api.finalize_tx(&mut slate)?;
+		slate = sender_api.finalize_tx(&mut slate, None, None)?;
 		Ok(())
 	})?;
 

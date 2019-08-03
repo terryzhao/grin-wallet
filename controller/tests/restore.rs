@@ -248,7 +248,7 @@ fn setup_restore(test_dir: &str) -> Result<(), libwallet::Error> {
 		let slate_i = sender_api.init_send_tx(args)?;
 		slate = client1.send_tx_slate_direct("wallet2", &slate_i)?;
 		sender_api.tx_lock_outputs(&slate, 0)?;
-		slate = sender_api.finalize_tx(&slate)?;
+		slate = sender_api.finalize_tx(&slate, None, None)?;
 		sender_api.post_tx(&slate.tx, false)?;
 		Ok(())
 	})?;
@@ -271,7 +271,7 @@ fn setup_restore(test_dir: &str) -> Result<(), libwallet::Error> {
 		let slate_i = sender_api.init_send_tx(args)?;
 		slate = client1.send_tx_slate_direct("wallet3", &slate_i)?;
 		sender_api.tx_lock_outputs(&slate, 0)?;
-		slate = sender_api.finalize_tx(&slate)?;
+		slate = sender_api.finalize_tx(&slate, None, None)?;
 		sender_api.post_tx(&slate.tx, false)?;
 		Ok(())
 	})?;
@@ -294,7 +294,7 @@ fn setup_restore(test_dir: &str) -> Result<(), libwallet::Error> {
 		let slate_i = sender_api.init_send_tx(args)?;
 		slate = client3.send_tx_slate_direct("wallet2", &slate_i)?;
 		sender_api.tx_lock_outputs(&slate, 0)?;
-		slate = sender_api.finalize_tx(&slate)?;
+		slate = sender_api.finalize_tx(&slate, None, None)?;
 		sender_api.post_tx(&slate.tx, false)?;
 		Ok(())
 	})?;
@@ -323,7 +323,7 @@ fn setup_restore(test_dir: &str) -> Result<(), libwallet::Error> {
 		let slate_i = sender_api.init_send_tx(args)?;
 		slate = client3.send_tx_slate_direct("wallet2", &slate_i)?;
 		sender_api.tx_lock_outputs(&slate, 0)?;
-		slate = sender_api.finalize_tx(&slate)?;
+		slate = sender_api.finalize_tx(&slate, None, None)?;
 		sender_api.post_tx(&slate.tx, false)?;
 		Ok(())
 	})?;

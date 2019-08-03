@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Grin wallet command-line function implementations
+
 use crate::util::{Mutex, ZeroingString};
 use chrono::NaiveDateTime as DateTime;
+use colored::*;
 use std::collections::HashMap;
-/// Grin wallet command-line function implementations
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::sync::mpsc::channel;
 use std::sync::Arc;
 use std::thread;
@@ -38,7 +40,8 @@ use crate::impls::{
 };
 use crate::impls::{HTTPNodeClient, WalletSeed};
 use crate::libwallet::{
-	InitTxArgs, IssueInvoiceTxArgs, Listener, NodeClient, OutputStatus, TxLogEntryType, WalletInst,
+	InitTxArgs, IssueInvoiceTxArgs, Listener, NodeClient, OutputStatus, TxLogEntryType, TxProof,
+	WalletInst,
 };
 use crate::{controller, display};
 
@@ -145,21 +148,26 @@ pub fn listen(config: &WalletConfig, args: &ListenArgs, g_args: &GlobalArgs) -> 
 			};
 
 			let grinrelay_config = config.grinrelay_config.clone().unwrap_or_default();
-			let (relay_rx, grinrelay_listener) = if grinrelay_config.enable_grinrelay {
-				// The streaming channel between 'grinrelay_listener' and 'foreign_listener'
-				let (relay_tx_as_payee, relay_rx) = channel();
+			let (grinrelay_key_path, relay_rx, grinrelay_listener) =
+				if grinrelay_config.enable_grinrelay {
+					// The streaming channel between 'grinrelay_listener' and 'foreign_listener'
+					let (relay_tx_as_payee, relay_rx) = channel();
 
-				let grinrelay_listener = controller::grinrelay_listener(
-					wallet.clone(),
-					config.grinrelay_config.clone().unwrap_or_default(),
-					None,
-					Some(relay_tx_as_payee),
-				)?;
+					let (grinrelay_key_path, grinrelay_listener) = controller::grinrelay_listener(
+						wallet.clone(),
+						config.grinrelay_config.clone().unwrap_or_default(),
+						None,
+						Some(relay_tx_as_payee),
+					)?;
 
-				(Some(relay_rx), Some(grinrelay_listener))
-			} else {
-				(None, None)
-			};
+					(
+						Some(grinrelay_key_path),
+						Some(relay_rx),
+						Some(grinrelay_listener),
+					)
+				} else {
+					(None, None, None)
+				};
 
 			controller::foreign_listener(
 				wallet.clone(),
@@ -167,6 +175,7 @@ pub fn listen(config: &WalletConfig, args: &ListenArgs, g_args: &GlobalArgs) -> 
 				tls_conf,
 				relay_rx,
 				grinrelay_listener,
+				grinrelay_key_path,
 				&g_args.account,
 			)?;
 			Ok(())
@@ -272,15 +281,17 @@ pub fn send(
 	let (relay_tx_as_payer, relay_rx) = channel();
 
 	let mut grinrelay_listener: Option<Box<Listener>> = None;
+	let mut grinrelay_key_path: Option<u64> = None;
 	if "relay" == args.method.as_str() {
 		// Start a Grin Relay service firstly
-		let listener = controller::grinrelay_listener(
+		let (key_path, listener) = controller::grinrelay_listener(
 			wallet.clone(),
 			wallet_config.grinrelay_config.clone().unwrap_or_default(),
 			Some(relay_tx_as_payer),
 			None,
 		)?;
 		grinrelay_listener = Some(listener);
+		grinrelay_key_path = Some(key_path);
 		thread::sleep(Duration::from_millis(1_000));
 	}
 
@@ -342,11 +353,12 @@ pub fn send(
 				_ => NullWalletCommAdapter::new(),
 			};
 			if adapter.supports_sync() {
-				slate = adapter.send_tx_sync(&args.dest, &slate)?;
+				let (returned_slate, tx_proof) = adapter.send_tx_sync(&args.dest, &slate)?;
+				slate = returned_slate;
 				api.tx_lock_outputs(&slate, 0)?;
 				if args.method == "self" {
 					controller::foreign_single_use(wallet, |api| {
-						slate = api.receive_tx(&slate, Some(&args.dest), None)?;
+						slate = api.receive_tx(&slate, Some(&args.dest), None, None)?;
 						Ok(())
 					})?;
 				}
@@ -354,7 +366,7 @@ pub fn send(
 					error!("Error validating participant messages: {}", e);
 					return Err(e);
 				}
-				slate = api.finalize_tx(&slate)?;
+				slate = api.finalize_tx(&slate, tx_proof, grinrelay_key_path)?;
 			} else {
 				adapter.send_tx_async(&args.dest, &slate)?;
 				api.tx_lock_outputs(&slate, 0)?;
@@ -396,7 +408,7 @@ pub fn receive(
 			error!("Error validating participant messages: {}", e);
 			return Err(e);
 		}
-		slate = api.receive_tx(&slate, Some(&g_args.account), args.message.clone())?;
+		slate = api.receive_tx(&slate, Some(&g_args.account), args.message.clone(), None)?;
 		Ok(())
 	})?;
 	let send_tx = format!("{}.response", args.input);
@@ -453,7 +465,7 @@ pub fn finalize(
 				error!("Error validating participant messages: {}", e);
 				return Err(e);
 			}
-			slate = api.finalize_tx(&mut slate)?;
+			slate = api.finalize_tx(&mut slate, None, None)?;
 			Ok(())
 		})?;
 	}
@@ -576,7 +588,7 @@ pub fn process_invoice(
 				_ => NullWalletCommAdapter::new(),
 			};
 			if adapter.supports_sync() {
-				slate = adapter.send_tx_sync(&args.dest, &slate)?;
+				slate = adapter.send_tx_sync(&args.dest, &slate)?.0;
 				api.tx_lock_outputs(&slate, 0)?;
 				if args.method == "self" {
 					controller::foreign_single_use(wallet, |api| {
@@ -797,6 +809,65 @@ pub fn txs(
 			// should only be one here, but just in case
 			for tx in &filtered_txs {
 				display::tx_messages(tx, dark_scheme)?;
+			}
+		};
+		Ok(())
+	})?;
+	Ok(())
+}
+
+/// Proof command args
+#[derive(Clone, Debug)]
+pub enum ProofArgs<'a> {
+	Export(u32, &'a str, &'a str),
+	Verify(&'a str),
+}
+
+/// Proof
+pub fn proof(
+	wallet: Arc<Mutex<WalletInst<impl NodeClient + 'static, keychain::ExtKeychain>>>,
+	_g_args: &GlobalArgs,
+	args: ProofArgs,
+	dark_scheme: bool,
+) -> Result<(), Error> {
+	let home_dir = dirs::home_dir()
+		.map(|p| p.to_str().unwrap().to_string())
+		.unwrap_or("~".to_string());
+
+	controller::owner_single_use(wallet.clone(), |api| {
+		match args {
+			ProofArgs::Export(index, filename, msg) => {
+				let tx_proof = api.get_stored_tx_proof(Some(index), None)?;
+				if let Some(mut tx_proof) = tx_proof {
+					let verified = api.verify_tx_proof(&tx_proof)?;
+
+					if !msg.is_empty() {
+						tx_proof.prover_msg = Some(msg.to_string());
+						let tx_entries = api.retrieve_txs(false, Some(index), None)?.1;
+						if tx_entries.len() > 0 {
+							if let Some(grinrelay_key_path) =
+								tx_entries.first().unwrap().grinrelay_key_path
+							{
+								let _ = api.sign_tx_proof(grinrelay_key_path, &mut tx_proof)?;
+							}
+						}
+					}
+
+					let mut file = File::create(filename.replace("~", &home_dir))?;
+					file.write_all(serde_json::to_string(&tx_proof)?.as_bytes())?;
+					println!("Proof exported to {}", filename.bright_green());
+					let _ = display::proof(verified, dark_scheme);
+				} else {
+					println!("No proof for this transaction");
+				}
+			}
+			ProofArgs::Verify(filename) => {
+				let mut file = File::open(filename.replace("~", &home_dir))?;
+				let mut tx_proof = String::new();
+				file.read_to_string(&mut tx_proof)?;
+				let tx_proof: TxProof = serde_json::from_str(&tx_proof)?;
+				let verified = api.verify_tx_proof(&tx_proof)?;
+				let _ = display::proof(verified, dark_scheme);
 			}
 		};
 		Ok(())

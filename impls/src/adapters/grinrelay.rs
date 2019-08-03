@@ -15,7 +15,7 @@
 /// Grin Relay 'plugin' implementation
 use crate::config::WalletConfig;
 use crate::libwallet::Listener;
-use crate::libwallet::{Error, ErrorKind, Slate, SlateVersion, VersionedSlate};
+use crate::libwallet::{Error, ErrorKind, Slate, SlateVersion, TxProof, VersionedSlate};
 use crate::WalletCommAdapter;
 use colored::*;
 use std::collections::HashMap;
@@ -27,14 +27,14 @@ const TTL: u16 = 10; // TODO: Pass this as a parameter
 
 pub struct GrinrelayWalletCommAdapter {
 	listener: Box<dyn Listener>,
-	relay_rx: Receiver<Slate>,
+	relay_rx: Receiver<(Slate, Option<TxProof>)>,
 }
 
 impl GrinrelayWalletCommAdapter {
 	/// Create
 	pub fn new(
 		listener: Box<dyn Listener>,
-		relay_rx: Receiver<Slate>,
+		relay_rx: Receiver<(Slate, Option<TxProof>)>,
 	) -> Box<dyn WalletCommAdapter> {
 		Box::new(GrinrelayWalletCommAdapter { listener, relay_rx })
 	}
@@ -45,7 +45,7 @@ impl WalletCommAdapter for GrinrelayWalletCommAdapter {
 		true
 	}
 
-	fn send_tx_sync(&self, dest: &str, slate: &Slate) -> Result<Slate, Error> {
+	fn send_tx_sync(&self, dest: &str, slate: &Slate) -> Result<(Slate, Option<TxProof>), Error> {
 		debug!(
 			"Posting transaction slate to {} via Grin Relay service",
 			dest
@@ -58,8 +58,8 @@ impl WalletCommAdapter for GrinrelayWalletCommAdapter {
 		let mut cnt = 0;
 		loop {
 			match self.relay_rx.try_recv() {
-				Ok(slate) => {
-					return Ok(slate);
+				Ok(s) => {
+					return Ok(s);
 				}
 				Err(TryRecvError::Disconnected) => {
 					return Err(ErrorKind::ClientCallback(

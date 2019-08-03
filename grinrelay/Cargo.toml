@@ -35,7 +35,6 @@ ws = { version="0.8", features=["ssl"] }
 
 grin_secp256k1zkp = { version = "0.7.7", features = ["bullet-proof-sizing"]}
 grin_wallet_libwallet = { path = "../libwallet", version = "2.0.1-alpha.2" }
-grin_wallet_api = { path = "../api", version = "2.0.1-alpha.2" }
 grin_wallet_util = { path = "../util", version = "2.0.1-alpha.2" }
 
 

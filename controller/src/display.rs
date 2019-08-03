@@ -16,10 +16,12 @@ use crate::core::core::{self, amount_to_hr_string};
 use crate::core::global;
 use crate::libwallet::{
 	AcctPathMapping, Error, OutputCommitMapping, OutputStatus, PaymentCommitMapping, TxLogEntry,
-	WalletInfo,
+	TxProofVerified, WalletInfo,
 };
 use crate::util;
+use colored::*;
 use prettytable;
+use rustc_serialize::hex::ToHex;
 use std::io::prelude::Write;
 use term;
 
@@ -576,6 +578,42 @@ pub fn tx_messages(tx: &TxLogEntry, dark_background_color_scheme: bool) -> Resul
 	table.set_format(*prettytable::format::consts::FORMAT_NO_COLSEP);
 	table.printstd();
 	println!();
+
+	Ok(())
+}
+
+/// Display transaction proof
+pub fn proof(verified: TxProofVerified, _dark_background_color_scheme: bool) -> Result<(), Error> {
+	let outputs = verified
+		.outputs
+		.iter()
+		.map(|o| o.0.to_vec().to_hex())
+		.collect::<Vec<_>>();
+	let excess = verified.excess.0.to_vec().to_hex();
+
+	println!(
+		"This file proves that {} grin was sent.\nTo:\t{}\nFrom:\t{}",
+		amount_to_hr_string(verified.amount, false).bright_green(),
+		format!("{}", verified.receiver).bright_green(),
+		format!("{}", verified.sender).bright_green()
+	);
+
+	println!("\nOutputs:");
+	for output in outputs {
+		println!("\t{}", output.bright_magenta());
+	}
+	println!("Kernel Excess:");
+	println!("\t{}", excess.bright_magenta());
+
+	//todo: node api provide kernel query!
+	//	println!("\n{}: This proof should only be considered valid if the kernel is actually on-chain with sufficient confirmations!",
+	//			 "WARNING".bright_yellow());
+	//	println!("Please use a grin block explorer to verify this is the case. for example:");
+	//	let prefix = match is_mainnet() {
+	//		true => "",
+	//		false => "floonet.",
+	//	};
+	//	cli_message!("   https://{}grinscan.net/kernel/{}", prefix, excess);
 
 	Ok(())
 }

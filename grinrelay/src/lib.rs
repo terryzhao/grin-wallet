@@ -47,9 +47,11 @@ use grin_wallet_libwallet as libwallet;
 use grin_wallet_util::grin_core;
 use grin_wallet_util::grin_util;
 
+pub use crate::crypto::{sign_challenge, verify_signature};
 pub use crate::error::ErrorKind;
 pub use crate::grinrelay::{GrinboxListener, GrinboxPublisher, GrinboxSubscriber};
 pub use crate::grinrelay_address::GrinboxAddress;
+pub use crate::tx_proof::TxProofImpl;
 pub use crate::types::{CloseReason, Controller, Publisher, Subscriber, SubscriptionHandler};
 
 pub use failure::Error;

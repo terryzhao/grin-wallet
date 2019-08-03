@@ -18,8 +18,8 @@ use crate::api::{self, ApiServer, BasicAuthMiddleware, ResponseFuture, Router, T
 use crate::config::GrinRelayConfig;
 use crate::keychain::Keychain;
 use crate::libwallet::{
-	Error, ErrorKind, Listener, NodeClient, NodeVersionInfo, Slate, SlateVersion, VersionedSlate,
-	WalletBackend, CURRENT_SLATE_VERSION, GRIN_BLOCK_HEADER_VERSION,
+	Error, ErrorKind, Listener, NodeClient, NodeVersionInfo, Slate, SlateVersion, TxProof,
+	VersionedSlate, WalletBackend, CURRENT_SLATE_VERSION, GRIN_BLOCK_HEADER_VERSION,
 };
 
 use crate::util::secp::key::PublicKey;
@@ -173,6 +173,7 @@ pub fn foreign_listener<T: ?Sized, C, K>(
 	tls_config: Option<TLSConfig>,
 	relay_rx_as_payee: Option<Receiver<(String, Slate)>>,
 	grinrelay_listener: Option<Box<dyn Listener>>,
+	grinrelay_key_path: Option<u64>,
 	account: &str,
 ) -> Result<(), Error>
 where
@@ -209,7 +210,8 @@ where
 				Ok((addr, slate)) => {
 					let slate_id = slate.id;
 					if api.verify_slate_messages(&slate).is_ok() {
-						let slate_rx = api.receive_tx(&slate, Some(account), None);
+						let slate_rx =
+							api.receive_tx(&slate, Some(account), None, grinrelay_key_path);
 						if let Ok(slate_rx) = slate_rx {
 							let versioned_slate =
 								VersionedSlate::into_version(slate_rx.clone(), SlateVersion::V2);
@@ -280,9 +282,9 @@ where
 pub fn grinrelay_listener<T: ?Sized, C, K>(
 	wallet: Arc<Mutex<T>>,
 	grinrelay_config: GrinRelayConfig,
-	relay_tx_as_payer: Option<Sender<Slate>>,
+	relay_tx_as_payer: Option<Sender<(Slate, Option<TxProof>)>>,
 	relay_tx_as_payee: Option<Sender<(String, Slate)>>,
-) -> Result<Box<dyn Listener>, Error>
+) -> Result<(u64, Box<dyn Listener>), Error>
 where
 	T: WalletBackend<C, K> + Send + Sync + 'static,
 	C: NodeClient + 'static,
@@ -303,7 +305,7 @@ where
 			}
 			path = rng.gen_range(0, 0x7fffffffu32);
 			info!(
-				"Random address (index: {}, path: {}) generated for this wallet sending",
+				"Random GrinRelay address (index: {}, path: {}) generated for this wallet sending",
 				index.to_string().bright_green(),
 				path.to_string().bright_green(),
 			);
@@ -314,6 +316,9 @@ where
 			}
 		}
 	}
+
+	// save this sending address by its derivation path|index
+	let grinrelay_key_path = ((path as u64) << 32) + (index as u64);
 
 	let (sec_key, pub_key) = {
 		let mut w = wallet.lock();
@@ -356,12 +361,15 @@ where
 		()
 	});
 
-	Ok(Box::new(GrinboxListener {
-		address,
-		publisher,
-		subscriber,
-		//		handle,
-	}))
+	Ok((
+		grinrelay_key_path,
+		Box::new(GrinboxListener {
+			address,
+			publisher,
+			subscriber,
+			//handle,
+		}),
+	))
 }
 
 type WalletResponseFuture = Box<dyn Future<Item = Response<Body>, Error = Error> + Send>;

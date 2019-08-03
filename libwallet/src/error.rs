@@ -197,6 +197,14 @@ pub enum ErrorKind {
 	#[fail(display = "Compatibility Error: {}", _0)]
 	Compatibility(String),
 
+	/// TxProof verification error
+	#[fail(display = "Transaction Proof Verification Error: {}", _0)]
+	VerifyProof(String),
+
+	/// TxProof signing failure
+	#[fail(display = "Transaction Proof Signing Fail: {}", _0)]
+	SignProof(String),
+
 	/// Other
 	#[fail(display = "Generic error: {}", _0)]
 	GenericError(String),
@@ -329,5 +337,11 @@ impl From<grin_store::Error> for Error {
 impl From<failure::Error> for Error {
 	fn from(error: failure::Error) -> Error {
 		Error::from(ErrorKind::GenericError(format!("{}", error)))
+	}
+}
+
+impl From<serde_json::error::Error> for Error {
+	fn from(error: serde_json::error::Error) -> Error {
+		Error::from(ErrorKind::Format(format!("{}", error)))
 	}
 }

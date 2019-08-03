@@ -147,7 +147,7 @@ fn file_exchange_test_impl(test_dir: &str) -> Result<(), libwallet::Error> {
 
 	// wallet 2 receives file, completes, sends file back
 	wallet::controller::foreign_single_use(wallet2.clone(), |api| {
-		slate = api.receive_tx(&slate, None, Some(sender2_message.clone()))?;
+		slate = api.receive_tx(&slate, None, Some(sender2_message.clone()), None)?;
 		adapter.send_tx_async(&receive_file, &mut slate)?;
 		Ok(())
 	})?;
@@ -157,7 +157,7 @@ fn file_exchange_test_impl(test_dir: &str) -> Result<(), libwallet::Error> {
 		let adapter = FileWalletCommAdapter::new();
 		let mut slate = adapter.receive_tx_async(&receive_file)?;
 		api.verify_slate_messages(&slate)?;
-		slate = api.finalize_tx(&slate)?;
+		slate = api.finalize_tx(&slate, None, None)?;
 		api.post_tx(&slate.tx, false)?;
 		bh += 1;
 		Ok(())

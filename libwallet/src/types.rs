@@ -22,12 +22,16 @@ use crate::grin_core::libtx::{aggsig, secp_ser};
 use crate::grin_core::ser;
 use crate::grin_keychain::{Identifier, Keychain};
 use crate::grin_util::secp::key::{PublicKey, SecretKey};
+use crate::grin_util::secp::pedersen::Commitment;
+use crate::grin_util::secp::Signature;
 use crate::grin_util::secp::{self, pedersen, Secp256k1};
 use crate::listener::Listener;
 use crate::slate::ParticipantMessages;
+use crate::slate_versions::VersionedSlate;
 use chrono::prelude::*;
 use failure::ResultExt;
-use serde;
+use rustc_serialize::hex::{FromHex, ToHex};
+use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
 use serde_json;
 use std::collections::HashMap;
 use std::fmt;
@@ -137,6 +141,12 @@ where
 
 	/// Retrieves a stored transaction from a TxLogEntry
 	fn get_stored_tx(&self, entry: &TxLogEntry) -> Result<Option<Transaction>, Error>;
+
+	/// Stores a transaction proof
+	fn store_tx_proof(&self, uuid: &str, tx_proof: &TxProof) -> Result<(), Error>;
+
+	/// Get a stored transaction proof
+	fn get_stored_tx_proof(&self, uuid: &str) -> Result<Option<TxProof>, Error>;
 
 	/// Create a new write batch to update or remove output data
 	fn batch<'a>(&'a mut self) -> Result<Box<dyn WalletOutputBatch<K> + 'a>, Error>;
@@ -559,8 +569,14 @@ pub struct Context {
 	/// store my inputs
 	/// Id, mmr_index (if known), amount
 	pub input_ids: Vec<(Identifier, Option<u64>, u64)>,
+	/// store the transaction amount
+	pub amount: u64,
 	/// store the calculated fee
 	pub fee: u64,
+	/// Output commitments
+	pub output_commits: Vec<Commitment>,
+	/// Input commitments
+	pub input_commits: Vec<Commitment>,
 	/// keep track of the participant id
 	pub participant_id: usize,
 }
@@ -584,7 +600,10 @@ impl Context {
 			sec_nonce,
 			input_ids: vec![],
 			output_ids: vec![],
+			amount: 0,
 			fee: 0,
+			output_commits: vec![],
+			input_commits: vec![],
 			participant_id: participant_id,
 		}
 	}
@@ -793,6 +812,9 @@ pub struct TxLogEntry {
 	pub messages: Option<ParticipantMessages>,
 	/// Location of the store transaction, (reference or resending)
 	pub stored_tx: Option<String>,
+	/// Grin Relay address path|index used for sending this tx
+	#[serde(with = "secp_ser::opt_string_or_u64")]
+	pub grinrelay_key_path: Option<u64>,
 }
 
 impl ser::Writeable for TxLogEntry {
@@ -826,6 +848,7 @@ impl TxLogEntry {
 			fee: None,
 			messages: None,
 			stored_tx: None,
+			grinrelay_key_path: None,
 		}
 	}
 
@@ -870,4 +893,168 @@ impl ser::Readable for AcctPathMapping {
 pub struct TxWrapper {
 	/// hex representation of transaction
 	pub tx_hex: String,
+}
+
+/// A generic key with 32 bytes data
+pub struct Key(pub [u8; 32]);
+
+impl Key {
+	/// Get a generic key from a [u8] slice
+	pub fn from_slice(data: &[u8]) -> Result<Key, Error> {
+		match data.len() {
+			32 => {
+				let mut ret = [0; 32];
+				ret[..].copy_from_slice(data);
+				Ok(Key(ret))
+			}
+			_ => Err(ErrorKind::Format("invalid key data length".to_owned()).into()),
+		}
+	}
+}
+
+/// Creates a [u8; 32] from a hex string
+pub fn u8_from_hex<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
+where
+	D: Deserializer<'de>,
+{
+	use serde::de::Error;
+	String::deserialize(deserializer)
+		.and_then(|string| {
+			string
+				.from_hex()
+				.map_err(|err| Error::custom(err.to_string()))
+		})
+		.and_then(|bytes: Vec<u8>| {
+			Ok(Key::from_slice(&bytes)
+				.map_err(|err| Error::custom(err.to_string()))?
+				.0)
+		})
+}
+
+/// Serializes a [u8] into a hex string
+pub fn u8_to_hex<S>(bytes: &[u8], serializer: S) -> Result<S::Ok, S::Error>
+where
+	S: Serializer,
+{
+	serializer.serialize_str(&&bytes[..].to_vec().to_hex())
+}
+
+/// Transaction Proof (when using Grin Relay service)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TxProof {
+	/// Recipient Grin Relay address
+	pub recipient_address: String,
+	/// Sender Grin Relay address
+	pub sender_address: String,
+	/// Decrypted Message
+	#[serde(
+		serialize_with = "proof_msg_to_readable",
+		deserialize_with = "readable_to_proof_msg"
+	)]
+	pub message: String,
+	/// Challenge string
+	pub challenge: String,
+	/// Message signature
+	#[serde(with = "secp_ser::sig_serde")]
+	pub signature: Signature,
+	/// Shared encryption key
+	#[serde(serialize_with = "u8_to_hex", deserialize_with = "u8_from_hex")]
+	pub key: [u8; 32],
+	/// Transaction amount
+	pub amount: u64,
+	/// Transaction fee
+	pub fee: u64,
+	/// Self owned inputs
+	pub inputs: Vec<Commitment>,
+	/// Self owned output (change)
+	pub outputs: Vec<Commitment>,
+	/// Prover sign message
+	pub prover_msg: Option<String>,
+	/// Prover message signature
+	#[serde(with = "secp_ser::option_sig_serde")]
+	pub prover_signature: Option<Signature>,
+}
+
+/// Transaction Proof verified result (when using Grin Relay service)
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TxProofVerified {
+	/// Sender's Grin Relay address
+	pub sender: String,
+	/// Receiver's Grin Relay address
+	pub receiver: String,
+	/// Transaction amount
+	pub amount: u64,
+	/// Receiver's output/s
+	pub outputs: Vec<Commitment>,
+	/// Transaction kernel excess
+	pub excess: Commitment,
+}
+
+/// Serializes a TxProof message into a readable string (without those \\\ escapes)
+pub fn proof_msg_to_readable<S>(message: &str, serializer: S) -> Result<S::Ok, S::Error>
+where
+	S: Serializer,
+{
+	use serde::ser::Error;
+	let decrypted_message: TxProofMessage =
+		serde_json::from_str(message).map_err(|err| Error::custom(err.to_string()))?;
+
+	let slate: VersionedSlate = serde_json::from_str(&decrypted_message.message)
+		.map_err(|err| Error::custom(err.to_string()))?;
+
+	let exp_message = TxProofMessageExp {
+		destination: decrypted_message.destination,
+		message: slate,
+		salt: decrypted_message.salt,
+		nonce: decrypted_message.nonce,
+	};
+
+	serializer.serialize_newtype_struct("message", &exp_message)
+}
+
+/// Deserialize a readable TxProof message string into a message (with those \\\ escapes)
+pub fn readable_to_proof_msg<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	use serde::de::Error;
+	TxProofMessageExp::deserialize(deserializer).and_then(|exp_message| {
+		let decrypted_message = TxProofMessage {
+			destination: exp_message.destination,
+			message: serde_json::to_string(&exp_message.message)
+				.map_err(|err| Error::custom(err.to_string()))?,
+			salt: exp_message.salt,
+			nonce: exp_message.nonce,
+		};
+
+		Ok(serde_json::to_string(&decrypted_message)
+			.map_err(|err| Error::custom(err.to_string()))?)
+	})
+}
+
+/// Dummy wrapper for the grin_wallet_relay::grinrelay_address::GrinboxAddress.
+#[derive(Serialize, Deserialize)]
+struct GrinboxAddress {
+	pub public_key: String,
+	pub domain: String,
+	pub port: Option<u16>,
+	pub hrp_bytes: Option<Vec<u8>>,
+}
+
+/// Dummy wrapper for the grin_wallet_relay::message::DecryptedMessage.
+#[derive(Serialize, Deserialize)]
+struct TxProofMessage {
+	pub destination: GrinboxAddress,
+	pub message: String,
+	pub salt: String,
+	pub nonce: String,
+}
+
+/// Dummy wrapper for the TxProofMessage with explicit VersionedSlate.
+#[derive(Serialize, Deserialize)]
+struct TxProofMessageExp {
+	pub destination: GrinboxAddress,
+	pub message: VersionedSlate,
+	pub salt: String,
+	pub nonce: String,
 }

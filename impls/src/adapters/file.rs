@@ -17,7 +17,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 
 use crate::config::WalletConfig;
-use crate::libwallet::{Error, ErrorKind, Slate};
+use crate::libwallet::{Error, ErrorKind, Slate, TxProof};
 use crate::WalletCommAdapter;
 use std::collections::HashMap;
 
@@ -36,7 +36,7 @@ impl WalletCommAdapter for FileWalletCommAdapter {
 		false
 	}
 
-	fn send_tx_sync(&self, _dest: &str, _slate: &Slate) -> Result<Slate, Error> {
+	fn send_tx_sync(&self, _dest: &str, _slate: &Slate) -> Result<(Slate, Option<TxProof>), Error> {
 		unimplemented!();
 	}
 

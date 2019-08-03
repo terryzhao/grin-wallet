@@ -26,7 +26,7 @@ use crate::core::global::{set_mining_mode, ChainTypes};
 use crate::core::{pow, ser};
 use crate::keychain::Keychain;
 use crate::libwallet::api_impl::foreign;
-use crate::libwallet::{NodeClient, NodeVersionInfo, Slate, TxWrapper, WalletInst};
+use crate::libwallet::{NodeClient, NodeVersionInfo, Slate, TxProof, TxWrapper, WalletInst};
 use crate::util;
 use crate::util::secp::pedersen;
 use crate::util::secp::pedersen::Commitment;
@@ -215,7 +215,7 @@ where
 			let mut w = wallet.1.lock();
 			w.open_with_credentials()?;
 			// receive tx
-			slate = foreign::receive_tx(&mut *w, &slate, None, None, false)?;
+			slate = foreign::receive_tx(&mut *w, &slate, None, None, None, false)?;
 			w.close()?;
 		}
 
@@ -350,7 +350,11 @@ impl WalletCommAdapter for LocalWalletClient {
 	}
 
 	/// Send the slate to a listening wallet instance
-	fn send_tx_sync(&self, dest: &str, slate: &Slate) -> Result<Slate, libwallet::Error> {
+	fn send_tx_sync(
+		&self,
+		dest: &str,
+		slate: &Slate,
+	) -> Result<(Slate, Option<TxProof>), libwallet::Error> {
 		let m = WalletProxyMessage {
 			sender_id: self.id.clone(),
 			dest: dest.to_owned(),
@@ -366,11 +370,12 @@ impl WalletCommAdapter for LocalWalletClient {
 		let r = self.rx.lock();
 		let m = r.recv().unwrap();
 		trace!("Received send_tx_slate response: {:?}", m.clone());
-		Ok(
+		Ok((
 			serde_json::from_str(&m.body).context(libwallet::ErrorKind::ClientCallback(
 				"Parsing send_tx_slate response".to_owned(),
 			))?,
-		)
+			None,
+		))
 	}
 
 	fn send_tx_async(&self, _dest: &str, _slate: &Slate) -> Result<(), libwallet::Error> {

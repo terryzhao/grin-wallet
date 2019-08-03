@@ -14,7 +14,7 @@
 
 /// HTTP Wallet 'plugin' implementation
 use crate::api;
-use crate::libwallet::{Error, ErrorKind, Slate};
+use crate::libwallet::{Error, ErrorKind, Slate, TxProof};
 use crate::WalletCommAdapter;
 use config::WalletConfig;
 use serde::Serialize;
@@ -85,7 +85,7 @@ impl WalletCommAdapter for HTTPWalletCommAdapter {
 		true
 	}
 
-	fn send_tx_sync(&self, dest: &str, slate: &Slate) -> Result<Slate, Error> {
+	fn send_tx_sync(&self, dest: &str, slate: &Slate) -> Result<(Slate, Option<TxProof>), Error> {
 		if &dest[..4] != "http" {
 			let err_str = format!(
 				"dest formatted as {} but send -d expected stdout or http://IP:port",
@@ -134,7 +134,7 @@ impl WalletCommAdapter for HTTPWalletCommAdapter {
 		let slate = Slate::deserialize_upgrade(&serde_json::to_string(&slate_value).unwrap())
 			.map_err(|_| ErrorKind::SlateDeser)?;
 
-		Ok(slate)
+		Ok((slate, None))
 	}
 
 	fn send_tx_async(&self, _dest: &str, _slate: &Slate) -> Result<(), Error> {

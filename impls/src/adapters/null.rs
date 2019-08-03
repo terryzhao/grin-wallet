@@ -14,7 +14,7 @@
 
 use crate::config::WalletConfig;
 /// Null Output 'plugin' implementation
-use crate::libwallet::{Error, Slate};
+use crate::libwallet::{Error, Slate, TxProof};
 use crate::WalletCommAdapter;
 
 use std::collections::HashMap;
@@ -34,8 +34,8 @@ impl WalletCommAdapter for NullWalletCommAdapter {
 		true
 	}
 
-	fn send_tx_sync(&self, _dest: &str, slate: &Slate) -> Result<Slate, Error> {
-		Ok(slate.clone())
+	fn send_tx_sync(&self, _dest: &str, slate: &Slate) -> Result<(Slate, Option<TxProof>), Error> {
+		Ok((slate.clone(), None))
 	}
 
 	fn send_tx_async(&self, _dest: &str, _slate: &Slate) -> Result<(), Error> {

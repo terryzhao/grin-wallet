@@ -13,12 +13,11 @@
 // limitations under the License.
 
 use std::cell::RefCell;
-use std::{fs, path};
+use std::{fs, path::Path};
 
-// for writing storedtransaction files
+// for writing stored transaction files
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::Path;
 
 use failure::ResultExt;
 use uuid::Uuid;
@@ -33,7 +32,7 @@ use crate::core::{global, ser};
 use crate::libwallet::{check_repair, check_repair_batch, restore, restore_batch};
 use crate::libwallet::{
 	AcctPathMapping, Context, Error, ErrorKind, Listener, NodeClient, OutputData, PaymentCommits,
-	PaymentData, TxLogEntry, WalletBackend, WalletOutputBatch,
+	PaymentData, TxLogEntry, TxProof, WalletBackend, WalletOutputBatch,
 };
 use crate::util;
 use crate::util::secp::constants::SECRET_KEY_SIZE;
@@ -43,6 +42,7 @@ use config::WalletConfig;
 
 pub const DB_DIR: &'static str = "db";
 pub const TX_SAVE_DIR: &'static str = "saved_txs";
+pub const TX_PROOF_SAVE_DIR: &'static str = "saved_proofs";
 
 const OUTPUT_PREFIX: u8 = 'o' as u8;
 const PAYMENT_PREFIX: u8 = 'P' as u8;
@@ -57,7 +57,7 @@ const ACCOUNT_PATH_MAPPING_PREFIX: u8 = 'a' as u8;
 /// test to see if database files exist in the current directory. If so,
 /// use a DB backend for all operations
 pub fn wallet_db_exists(config: WalletConfig) -> bool {
-	let db_path = path::Path::new(&config.data_file_dir).join(DB_DIR);
+	let db_path = Path::new(&config.data_file_dir).join(DB_DIR);
 	db_path.exists()
 }
 
@@ -111,12 +111,16 @@ pub struct LMDBBackend<C, K> {
 
 impl<C, K> LMDBBackend<C, K> {
 	pub fn new(config: WalletConfig, passphrase: &str, n_client: C) -> Result<Self, Error> {
-		let db_path = path::Path::new(&config.data_file_dir).join(DB_DIR);
+		let db_path = Path::new(&config.data_file_dir).join(DB_DIR);
 		fs::create_dir_all(&db_path).expect("Couldn't create wallet backend directory!");
 
-		let stored_tx_path = path::Path::new(&config.data_file_dir).join(TX_SAVE_DIR);
+		let stored_tx_path = Path::new(&config.data_file_dir).join(TX_SAVE_DIR);
 		fs::create_dir_all(&stored_tx_path)
 			.expect("Couldn't create wallet backend tx storage directory!");
+
+		let stored_tx_proof_path = Path::new(&config.data_file_dir).join(TX_PROOF_SAVE_DIR);
+		fs::create_dir_all(&stored_tx_proof_path)
+			.expect("Couldn't create wallet backend tx proof storage directory!");
 
 		let store = store::Store::new(db_path.to_str().unwrap(), None, Some(DB_DIR), None)?;
 
@@ -160,7 +164,7 @@ impl<C, K> LMDBBackend<C, K> {
 	/// Just test to see if database files exist in the current directory. If
 	/// so, use a DB backend for all operations
 	pub fn exists(config: WalletConfig) -> bool {
-		let db_path = path::Path::new(&config.data_file_dir).join(DB_DIR);
+		let db_path = Path::new(&config.data_file_dir).join(DB_DIR);
 		db_path.exists()
 	}
 }
@@ -338,7 +342,7 @@ where
 
 	fn store_tx(&self, uuid: &str, tx: &Transaction) -> Result<(), Error> {
 		let filename = format!("{}.grintx", uuid);
-		let path = path::Path::new(&self.config.data_file_dir)
+		let path = Path::new(&self.config.data_file_dir)
 			.join(TX_SAVE_DIR)
 			.join(filename);
 		let path_buf = Path::new(&path).to_path_buf();
@@ -349,12 +353,25 @@ where
 		Ok(())
 	}
 
+	fn store_tx_proof(&self, uuid: &str, tx_proof: &TxProof) -> Result<(), Error> {
+		let filename = format!("{}.proof", uuid);
+		let path = Path::new(&self.config.data_file_dir)
+			.join(TX_PROOF_SAVE_DIR)
+			.join(filename);
+		let path_buf = Path::new(&path).to_path_buf();
+		let mut stored_tx_proof = File::create(path_buf)?;
+		let proof_ser = serde_json::to_string(tx_proof)?;
+		stored_tx_proof.write_all(&proof_ser.as_bytes())?;
+		stored_tx_proof.sync_all()?;
+		Ok(())
+	}
+
 	fn get_stored_tx(&self, entry: &TxLogEntry) -> Result<Option<Transaction>, Error> {
 		let filename = match entry.stored_tx.clone() {
 			Some(f) => f,
 			None => return Ok(None),
 		};
-		let path = path::Path::new(&self.config.data_file_dir)
+		let path = Path::new(&self.config.data_file_dir)
 			.join(TX_SAVE_DIR)
 			.join(filename);
 		let tx_file = Path::new(&path).to_path_buf();
@@ -365,6 +382,21 @@ where
 		Ok(Some(
 			ser::deserialize::<Transaction>(&mut &tx_bin[..]).unwrap(),
 		))
+	}
+
+	fn get_stored_tx_proof(&self, uuid: &str) -> Result<Option<TxProof>, Error> {
+		let filename = format!("{}.proof", uuid);
+		let path = Path::new(&self.config.data_file_dir)
+			.join(TX_PROOF_SAVE_DIR)
+			.join(filename);
+		let tx_proof_file = Path::new(&path).to_path_buf();
+		if !tx_proof_file.exists() {
+			return Ok(None);
+		}
+		let mut tx_proof_f = File::open(tx_proof_file)?;
+		let mut content = String::new();
+		tx_proof_f.read_to_string(&mut content)?;
+		Ok(Some(serde_json::from_str(&content)?))
 	}
 
 	fn batch<'a>(&'a mut self) -> Result<Box<dyn WalletOutputBatch<K> + 'a>, Error> {

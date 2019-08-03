@@ -59,6 +59,7 @@ pub fn receive_tx<T: ?Sized, C, K>(
 	slate: &Slate,
 	dest_acct_name: Option<&str>,
 	message: Option<String>,
+	grinrelay_key_path: Option<u64>,
 	use_test_rng: bool,
 ) -> Result<Slate, Error>
 where
@@ -108,7 +109,7 @@ where
 		false,
 		use_test_rng,
 	)?;
-	tx::update_message(&mut *w, &mut ret_slate)?;
+	tx::update_message(&mut *w, &mut ret_slate, grinrelay_key_path)?;
 	Ok(ret_slate)
 }
 
@@ -122,8 +123,8 @@ where
 	let mut sl = slate.clone();
 	let context = w.get_private_context(sl.id.as_bytes(), 1)?;
 	tx::complete_tx(&mut *w, &mut sl, 1, &context)?;
-	tx::update_stored_tx(&mut *w, &mut sl, true)?;
-	tx::update_message(&mut *w, &mut sl)?;
+	tx::update_stored_tx(&mut *w, &mut sl, None, true)?;
+	tx::update_message(&mut *w, &mut sl, None)?;
 	{
 		let mut batch = w.batch()?;
 		batch.delete_private_context(sl.id.as_bytes(), 1)?;

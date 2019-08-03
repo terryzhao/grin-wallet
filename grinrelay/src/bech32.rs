@@ -22,7 +22,7 @@
 //!
 //! # Examples
 //! ```rust
-//! use bech32::Bech32;
+//! use grin_wallet_relay::bech32::Bech32;
 //!
 //! let addr = Bech32 {
 //!            hrp: "gn".to_string(),

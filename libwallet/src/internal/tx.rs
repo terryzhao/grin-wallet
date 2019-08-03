@@ -22,7 +22,7 @@ use crate::grin_keychain::{Identifier, Keychain};
 use crate::grin_util::Mutex;
 use crate::internal::{selection, updater};
 use crate::slate::Slate;
-use crate::types::{Context, NodeClient, TxLogEntryType, WalletBackend};
+use crate::types::{Context, NodeClient, TxLogEntryType, TxProof, WalletBackend};
 use crate::{Error, ErrorKind};
 
 // static for incrementing test UUIDs
@@ -152,6 +152,15 @@ where
 		parent_key_id.clone(),
 		use_test_rng,
 	)?;
+
+	// Store input and output commitments in context
+	// They will be added to the transaction proof
+	for input in slate.tx.inputs() {
+		context.input_commits.push(input.commit.clone());
+	}
+	for output in slate.tx.outputs() {
+		context.output_commits.push(output.commit.clone());
+	}
 
 	// Generate a kernel offset and subtract from our context's secret key. Store
 	// the offset in the slate's transaction kernel, and adds our public key
@@ -284,6 +293,7 @@ where
 pub fn update_stored_tx<T: ?Sized, C, K>(
 	wallet: &mut T,
 	slate: &Slate,
+	tx_proof: Option<TxProof>,
 	is_invoiced: bool,
 ) -> Result<(), Error>
 where
@@ -309,12 +319,20 @@ where
 		Some(t) => t,
 		None => return Err(ErrorKind::TransactionDoesntExist(slate.id.to_string()))?,
 	};
-	wallet.store_tx(&format!("{}", tx.tx_slate_id.unwrap()), &slate.tx)?;
+	let id = tx.tx_slate_id.unwrap().to_string();
+	if let Some(ref proof) = tx_proof {
+		wallet.store_tx_proof(&id, proof)?;
+	}
+	wallet.store_tx(&id, &slate.tx)?;
 	Ok(())
 }
 
 /// Update the transaction participant messages
-pub fn update_message<T: ?Sized, C, K>(wallet: &mut T, slate: &Slate) -> Result<(), Error>
+pub fn update_message<T: ?Sized, C, K>(
+	wallet: &mut T,
+	slate: &Slate,
+	grinrelay_key_path: Option<u64>,
+) -> Result<(), Error>
 where
 	T: WalletBackend<C, K>,
 	C: NodeClient,
@@ -327,6 +345,7 @@ where
 	let mut batch = wallet.batch()?;
 	for mut tx in tx_vec.into_iter() {
 		tx.messages = Some(slate.participant_messages());
+		tx.grinrelay_key_path = grinrelay_key_path;
 		let parent_key = tx.parent_key_id.clone();
 		batch.save_tx_log_entry(tx, &parent_key)?;
 	}

@@ -33,6 +33,7 @@ use linefeed::{Interface, ReadResult};
 use rpassword;
 use std::io::Write;
 use std::path::Path;
+use std::str::FromStr;
 use std::sync::Arc;
 
 // shut up test compilation warnings
@@ -42,6 +43,12 @@ use grin_wallet_impls::FileWalletCommAdapter;
 use grin_wallet_libwallet::Slate;
 #[cfg(not(test))]
 use grin_wallet_util::grin_core::core::amount_to_hr_string;
+
+macro_rules! usage {
+	( $r:expr ) => {
+		return Err(ErrorKind::Usage($r.usage().to_owned()));
+	};
+}
 
 // define what to do on argument error
 macro_rules! arg_parse {
@@ -70,6 +77,19 @@ impl From<std::io::Error> for ParseError {
 	fn from(e: std::io::Error) -> ParseError {
 		ParseError::IOError(format!("{}", e))
 	}
+}
+
+fn required<'a>(args: &'a ArgMatches, name: &str) -> Result<&'a str, ErrorKind> {
+	args.value_of(name)
+		.ok_or_else(|| ErrorKind::Argument(name.to_owned()))
+}
+
+fn parse<T>(arg: &str) -> Result<T, ErrorKind>
+where
+	T: FromStr,
+{
+	arg.parse::<T>()
+		.map_err(|_| ErrorKind::ParseNumber(arg.to_owned()))
 }
 
 fn prompt_password_stdout(prompt: &str) -> ZeroingString {
@@ -832,6 +852,24 @@ pub fn parse_txs_args(args: &ArgMatches) -> Result<command::TxsArgs, ParseError>
 	})
 }
 
+pub fn proof_command<'a>(args: &'a ArgMatches) -> Result<command::ProofArgs<'a>, ErrorKind> {
+	let proof_args = match args.subcommand() {
+		("export", Some(args)) => command::ProofArgs::Export(
+			parse(required(args, "index")?)?,
+			required(args, "filename")?,
+			match args.value_of("message") {
+				None => "",
+				Some(msg) => msg,
+			},
+		),
+		("verify", Some(args)) => command::ProofArgs::Verify(required(args, "filename")?),
+		(_, _) => {
+			usage!(args);
+		}
+	};
+	Ok(proof_args)
+}
+
 pub fn parse_repost_args(args: &ArgMatches) -> Result<command::RepostArgs, ParseError> {
 	let tx_id = match args.value_of("id") {
 		None => None,
@@ -1010,6 +1048,12 @@ pub fn wallet_command(
 				wallet_config.dark_background_color_scheme.unwrap_or(true),
 			)
 		}
+		("proof", Some(args)) => command::proof(
+			inst_wallet(),
+			&global_wallet_args,
+			proof_command(args)?,
+			wallet_config.dark_background_color_scheme.unwrap_or(true),
+		),
 		("repost", Some(args)) => {
 			let a = arg_parse!(parse_repost_args(&args));
 			command::repost(inst_wallet(), a)

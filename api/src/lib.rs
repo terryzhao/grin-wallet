@@ -22,12 +22,13 @@
 #![deny(unused_mut)]
 #![warn(missing_docs)]
 
+use grin_wallet_relay as grinrelay;
 use grin_wallet_util::grin_core as core;
 use grin_wallet_util::grin_keychain as keychain;
 use grin_wallet_util::grin_util as util;
-extern crate grin_wallet_config as config;
-extern crate grin_wallet_impls as impls;
-extern crate grin_wallet_libwallet as libwallet;
+
+use grin_wallet_impls as impls;
+use grin_wallet_libwallet as libwallet;
 
 extern crate failure_derive;
 extern crate serde_json;

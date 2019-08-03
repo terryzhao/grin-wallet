@@ -116,7 +116,7 @@ fn basic_transaction_api(test_dir: &str) -> Result<(), libwallet::Error> {
 
 		slate = client1.send_tx_slate_direct("wallet2", &slate_i)?;
 		sender_api.tx_lock_outputs(&slate, 0)?;
-		slate = sender_api.finalize_tx(&slate)?;
+		slate = sender_api.finalize_tx(&slate, None, None)?;
 
 		// Check we have a single kernel and that it is a Plain kernel (no lock_height).
 		assert_eq!(slate.tx.kernels().len(), 1);
@@ -298,7 +298,7 @@ fn basic_transaction_api(test_dir: &str) -> Result<(), libwallet::Error> {
 		let slate_i = sender_api.init_send_tx(args)?;
 		slate = client1.send_tx_slate_direct("wallet2", &slate_i)?;
 		sender_api.tx_lock_outputs(&slate, 0)?;
-		slate = sender_api.finalize_tx(&slate)?;
+		slate = sender_api.finalize_tx(&slate, None, None)?;
 		Ok(())
 	})?;
 
@@ -398,7 +398,7 @@ fn tx_rollback(test_dir: &str) -> Result<(), libwallet::Error> {
 		let slate_i = sender_api.init_send_tx(args)?;
 		slate = client1.send_tx_slate_direct("wallet2", &slate_i)?;
 		sender_api.tx_lock_outputs(&slate, 0)?;
-		slate = sender_api.finalize_tx(&slate)?;
+		slate = sender_api.finalize_tx(&slate, None, None)?;
 		Ok(())
 	})?;
 

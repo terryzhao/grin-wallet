@@ -291,6 +291,38 @@ subcommands:
             short: l
             long: limit
             takes_value: true
+  - proof:
+      about: Export or verify a transaction proof
+      subcommands:
+        - export:
+            about: Export a transaction proof to a file
+            args:
+              - index:
+                  help: The index of the transaction
+                  short: i
+                  long: index
+                  takes_value: true
+                  required: true
+              - filename:
+                  help: The file to export into
+                  short: f
+                  long: file
+                  takes_value: true
+                  required: true
+              - message:
+                  help: The message to sign for prover
+                  short: m
+                  long: message
+                  takes_value: true
+                  required: false
+        - verify:
+            about: Verify a transaction proof file
+            args:
+              - filename:
+                  help: The transaction proof file to be verified
+                  short: f
+                  long: file
+                  takes_value: true
   - repost:
       about: Reposts a stored, completed but unconfirmed transaction to the chain, or dumps it to a file
       args:

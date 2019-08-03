@@ -28,7 +28,7 @@ use crate::types::{AcctPathMapping, NodeClient, TxLogEntry, TxWrapper, WalletBac
 use crate::{Error, ErrorKind};
 use crate::{
 	InitTxArgs, IssueInvoiceTxArgs, NodeHeightResult, OutputCommitMapping, PaymentCommitMapping,
-	TxLogEntryType,
+	TxLogEntryType, TxProof,
 };
 
 const USER_MESSAGE_MAX_LEN: usize = 256;
@@ -380,7 +380,12 @@ where
 }
 
 /// Finalize slate
-pub fn finalize_tx<T: ?Sized, C, K>(w: &mut T, slate: &Slate) -> Result<Slate, Error>
+pub fn finalize_tx<T: ?Sized, C, K>(
+	w: &mut T,
+	slate: &Slate,
+	tx_proof: Option<TxProof>,
+	grinrelay_key_path: Option<u64>,
+) -> Result<Slate, Error>
 where
 	T: WalletBackend<C, K>,
 	C: NodeClient,
@@ -388,9 +393,18 @@ where
 {
 	let mut sl = slate.clone();
 	let context = w.get_private_context(sl.id.as_bytes(), 0)?;
+
+	let tx_proof = tx_proof.map(|mut proof| {
+		proof.amount = context.amount;
+		proof.fee = context.fee;
+		proof.inputs.append(&mut context.input_commits.clone());
+		proof.outputs.append(&mut context.output_commits.clone());
+		proof
+	});
+
 	tx::complete_tx(&mut *w, &mut sl, 0, &context)?;
-	tx::update_stored_tx(&mut *w, &mut sl, false)?;
-	tx::update_message(&mut *w, &mut sl)?;
+	tx::update_stored_tx(&mut *w, &mut sl, tx_proof, false)?;
+	tx::update_message(&mut *w, &mut sl, grinrelay_key_path)?;
 	{
 		let mut batch = w.batch()?;
 		batch.delete_private_context(sl.id.as_bytes(), 0)?;
@@ -456,6 +470,33 @@ where
 /// verify slate messages
 pub fn verify_slate_messages(slate: &Slate) -> Result<(), Error> {
 	slate.verify_messages()
+}
+
+/// get stored transaction proof
+pub fn get_stored_tx_proof<T: ?Sized, C, K>(
+	w: &mut T,
+	tx_id: Option<u32>,
+	tx_slate_id: Option<Uuid>,
+) -> Result<Option<TxProof>, Error>
+where
+	T: WalletBackend<C, K>,
+	C: NodeClient,
+	K: Keychain,
+{
+	let mut slate_id = None;
+	if let Some(id) = tx_slate_id {
+		slate_id = Some(id);
+	} else {
+		let tx_entries = retrieve_txs(w, false, tx_id, tx_slate_id)?.1;
+		if tx_entries.len() > 0 {
+			slate_id = tx_entries.first().unwrap().tx_slate_id;
+		}
+	}
+
+	match slate_id {
+		Some(slate_id) => w.get_stored_tx_proof(&slate_id.to_string()),
+		None => Ok(None),
+	}
 }
 
 /// Attempt to restore contents of wallet

@@ -64,6 +64,6 @@ pub use internal::restore::{check_repair, check_repair_batch, restore, restore_b
 pub use listener::Listener;
 pub use types::{
 	AcctPathMapping, BlockIdentifier, Context, NodeClient, NodeVersionInfo, OutputData,
-	OutputStatus, PaymentCommits, PaymentData, TxLogEntry, TxLogEntryType, TxWrapper,
-	WalletBackend, WalletInfo, WalletInst, WalletOutputBatch,
+	OutputStatus, PaymentCommits, PaymentData, TxLogEntry, TxLogEntryType, TxProof,
+	TxProofVerified, TxWrapper, WalletBackend, WalletInfo, WalletInst, WalletOutputBatch,
 };

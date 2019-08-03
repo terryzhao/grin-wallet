@@ -25,7 +25,7 @@ pub use self::keybase::KeybaseWalletCommAdapter;
 pub use self::null::NullWalletCommAdapter;
 
 use crate::config::WalletConfig;
-use crate::libwallet::{Error, Slate};
+use crate::libwallet::{Error, Slate, TxProof};
 use std::collections::HashMap;
 
 /// Encapsulate wallet to wallet communication functions
@@ -35,7 +35,7 @@ pub trait WalletCommAdapter {
 
 	/// Send a transaction slate to another listening wallet and return result
 	/// TODO: Probably need a slate wrapper type
-	fn send_tx_sync(&self, addr: &str, slate: &Slate) -> Result<Slate, Error>;
+	fn send_tx_sync(&self, addr: &str, slate: &Slate) -> Result<(Slate, Option<TxProof>), Error>;
 
 	/// Send a transaction asynchronously (result will be returned via the listener)
 	fn send_tx_async(&self, addr: &str, slate: &Slate) -> Result<(), Error>;
