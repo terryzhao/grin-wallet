@@ -68,17 +68,17 @@ matrix:
     env: CI_JOB="test"        CI_JOB_ARGS="config libwallet api"
   - os: windows
     env: CI_JOB="test"        CI_JOB_ARGS="impls"
-#  - os: windows
-#    env: CI_JOB="test"        CI_JOB_ARGS="controller"
-#  - os: windows
-#    env: CI_JOB="test"        CI_JOB_ARGS="xyz"
-#  - os: windows
-#    env: CI_JOB="release"     CI_JOB_ARGS=
+  - os: windows
+    env: CI_JOB="test"        CI_JOB_ARGS="controller"
+  - os: windows
+    env: CI_JOB="test"        CI_JOB_ARGS="xyz"
+  - os: windows
+    env: CI_JOB="release"     CI_JOB_ARGS=
 
 script:
-- if [ "$TRAVIS_OS_NAME" = "windows" ] && [[ "$CI_JOB_ARGS" = "controller" || "$CI_JOB_ARGS" = "xyz" ]]; then
-    git clone --depth 1 https://github.com/Microsoft/vcpkg.git && cd vcpkg && ./bootstrap-vcpkg.bat && ./vcpkg install openssl:x64-windows-static && cd - > /dev/null || exit 1;
-  fi
+#- if [ "$TRAVIS_OS_NAME" = "windows" ] && [[ "$CI_JOB_ARGS" = "controller" || "$CI_JOB_ARGS" = "xyz" ]]; then
+#    git clone --depth 1 https://github.com/Microsoft/vcpkg.git && cd vcpkg && ./bootstrap-vcpkg.bat && ./vcpkg install openssl:x64-windows-static && cd - > /dev/null || exit 1;
+#  fi
 - bash .ci/general-jobs
 
 before_cache:

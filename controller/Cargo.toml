@@ -42,3 +42,6 @@ grin_wallet_impls = { path = "../impls", version = "2.0.1-alpha.2" }
 grin_wallet_libwallet = { path = "../libwallet", version = "2.0.1-alpha.2" }
 grin_wallet_config = { path = "../config", version = "2.0.1-alpha.2" }
 grin_wallet_relay = { path = "../grinrelay", version = "2.0.1-alpha.2" }
+
+[features]
+ssl = ["grin_wallet_relay/ssl"]

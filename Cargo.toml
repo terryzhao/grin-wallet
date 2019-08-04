@@ -42,3 +42,8 @@ grin_wallet_relay = { path = "./grinrelay", version = "2.0.1-alpha.2" }
 
 [build-dependencies]
 built = "0.3"
+
+[features]
+ssl = ["grin_wallet_relay/ssl"]
+
+

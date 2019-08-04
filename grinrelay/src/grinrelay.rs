@@ -23,8 +23,11 @@ use std::sync::Arc;
 use crate::grinrelay_address::GrinboxAddress;
 use crate::libwallet::{Listener, VersionedSlate};
 use crate::message::EncryptedMessage;
+#[cfg(feature = "ssl")]
 use openssl::ssl::{SslConnector, SslMethod, SslStream, SslVerifyMode};
+#[cfg(feature = "ssl")]
 use url::Url;
+#[cfg(feature = "ssl")]
 use ws::util::TcpStream as WsTcpStream;
 use ws::util::Token;
 use ws::{
@@ -503,6 +506,7 @@ where
 		}
 	}
 
+	#[cfg(feature = "ssl")]
 	fn upgrade_ssl_client(
 		&mut self,
 		sock: WsTcpStream,
