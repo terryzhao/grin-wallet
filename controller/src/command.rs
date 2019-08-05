@@ -379,7 +379,8 @@ pub fn send(
 						return Ok(());
 					}
 					Err(e) => {
-						error!("Tx sent fail: {}", e);
+						error!("Tx sent fail on post: {}.", e);
+						let _ = api.cancel_tx(None, Some(slate.id));
 						return Err(e);
 					}
 				}
