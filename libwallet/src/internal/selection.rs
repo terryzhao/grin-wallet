@@ -162,6 +162,7 @@ where
 				is_coinbase: false,
 				tx_log_entry: Some(log_id),
 				slate_id: Some(slate_id.clone()),
+				is_change: Some(true),
 			})?;
 		}
 		batch.save_tx_log_entry(t.clone(), &parent_key_id)?;
@@ -234,6 +235,7 @@ where
 		is_coinbase: false,
 		tx_log_entry: Some(log_id),
 		slate_id: Some(slate_id),
+		is_change: Some(false),
 	})?;
 	batch.save_tx_log_entry(t, &parent_key_id)?;
 	batch.commit()?;

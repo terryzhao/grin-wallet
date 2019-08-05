@@ -154,6 +154,7 @@ pub trait OwnerRpc {
 						"output": {
 							"commit": "08e1da9e6dc4d6e808a718b2f110a991dd775d65ce5ae408a4e1f002a4961aa9e7",
 							"height": "1",
+							"is_change": false,
 							"is_coinbase": true,
 							"key_id": "0300000000000000000000000000000000",
 							"lock_height": "4",
@@ -171,6 +172,7 @@ pub trait OwnerRpc {
 						"output": {
 							"commit": "087df32304c5d4ae8b2af0bc31e700019d722910ef87dd4eec3197b80b207e3045",
 							"height": "2",
+							"is_change": false,
 							"is_coinbase": true,
 							"key_id": "0300000000000000000000000100000000",
 							"lock_height": "5",

@@ -359,6 +359,8 @@ pub struct OutputData {
 	pub tx_log_entry: Option<u32>,
 	/// Unique transaction ID, selected by sender
 	pub slate_id: Option<Uuid>,
+	/// Is this a change output?
+	pub is_change: Option<bool>,
 }
 
 impl ser::Writeable for OutputData {
@@ -412,7 +414,19 @@ impl OutputData {
 		{
 			return true;
 		} else if self.status == OutputStatus::Unconfirmed && minimum_confirmations == 0 {
-			return true;
+			return match self.is_change {
+				// normally it's safe to spend 0-confirmed change output/s
+				Some(true) => true,
+				_ => {
+					if self.num_confirmations(current_height) >= 1 {
+						// also it's safe to spend 1-confirmed received output/s
+						true
+					} else {
+						// must not spend 0-confirmed received output/s
+						false
+					}
+				}
+			};
 		} else {
 			return false;
 		}

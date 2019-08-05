@@ -239,6 +239,7 @@ where
 		is_coinbase: output.is_coinbase,
 		tx_log_entry: Some(log_id),
 		slate_id: None,
+		is_change: None,
 	});
 
 	let max_child_index = found_parents.get(&parent_key_id).unwrap().clone();

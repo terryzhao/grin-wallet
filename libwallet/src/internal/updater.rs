@@ -558,6 +558,7 @@ where
 			is_coinbase: true,
 			tx_log_entry: None,
 			slate_id: None,
+			is_change: Some(false),
 		})?;
 		batch.commit()?;
 	}

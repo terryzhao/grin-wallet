@@ -56,6 +56,7 @@ pub fn outputs(
 		bMG->"Locked Until",
 		bMG->"Status",
 		bMG->"Coinbase?",
+		bMG->"Change?",
 		bMG->"# Confirms",
 		bMG->"Value",
 		bMG->"Tx"
@@ -71,6 +72,10 @@ pub fn outputs(
 		let height = format!("{}", m.output.height);
 		let lock_height = format!("{}", m.output.lock_height);
 		let is_coinbase = format!("{}", m.output.is_coinbase);
+		let is_change = match m.output.is_change {
+			None => String::new(),
+			Some(t) => t.to_string(),
+		};
 
 		// Mark unconfirmed coinbase outputs as "Mining" instead of "Unconfirmed"
 		let status = match m.output.status {
@@ -79,7 +84,7 @@ pub fn outputs(
 		};
 
 		let num_confirmations = format!("{}", m.output.num_confirmations(cur_height));
-		let value = format!("{}", core::amount_to_hr_string(m.output.value, false));
+		let value = format!("{}", core::amount_to_hr_string(m.output.value, true));
 		let tx = match m.output.tx_log_entry {
 			None => "".to_owned(),
 			Some(t) => t.to_string(),
@@ -93,6 +98,7 @@ pub fn outputs(
 				bFB->lock_height,
 				bFR->status,
 				bFY->is_coinbase,
+				bFY->is_change,
 				bFB->num_confirmations,
 				bFG->value,
 				bFC->tx,
@@ -105,6 +111,7 @@ pub fn outputs(
 				bFB->lock_height,
 				bFR->status,
 				bFD->is_coinbase,
+				bFD->is_change,
 				bFB->num_confirmations,
 				bFG->value,
 				bFD->tx,
