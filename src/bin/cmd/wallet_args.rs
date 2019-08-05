@@ -1054,6 +1054,10 @@ pub fn wallet_command(
 			proof_command(args)?,
 			wallet_config.dark_background_color_scheme.unwrap_or(true),
 		),
+		("address", Some(_)) => command::address(
+			inst_wallet(),
+			wallet_config.grinrelay_config.unwrap_or_default(),
+		),
 		("repost", Some(args)) => {
 			let a = arg_parse!(parse_repost_args(&args));
 			command::repost(inst_wallet(), a)

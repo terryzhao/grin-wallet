@@ -32,7 +32,7 @@ use crate::api::TLSConfig;
 use crate::core::core;
 use crate::keychain;
 
-use crate::config::WalletConfig;
+use crate::config::{GrinRelayConfig, WalletConfig};
 use crate::error::{Error, ErrorKind};
 use crate::impls::{
 	instantiate_wallet, FileWalletCommAdapter, GrinrelayWalletCommAdapter, HTTPWalletCommAdapter,
@@ -873,6 +873,20 @@ pub fn proof(
 		};
 		Ok(())
 	})?;
+	Ok(())
+}
+
+/// Proof
+pub fn address(
+	wallet: Arc<Mutex<WalletInst<impl NodeClient + 'static, keychain::ExtKeychain>>>,
+	grinrelay_config: GrinRelayConfig,
+) -> Result<(), Error> {
+	let relay_addr = controller::grinrelay_address(wallet, grinrelay_config)?;
+	println!(
+		"Your current Grin Relay address for receiving: {}\
+		 \n(Please run `grin-wallet listen` for receiving Grin on this address.)",
+		relay_addr.bright_green(),
+	);
 	Ok(())
 }
 

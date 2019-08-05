@@ -400,3 +400,5 @@ subcommands:
             takes_value: false
   - passwd:
       about: Changing password for wallet.
+  - address:
+      about: Query current Grin Relay receiving address for wallet.
