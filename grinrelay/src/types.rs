@@ -174,22 +174,28 @@ where
 	}
 
 	fn on_close(&self, reason: CloseReason) {
+		let len = self.name.len().saturating_sub(6);
 		match reason {
-			CloseReason::Normal => info!("Listener for {} stopped", self.name.bright_green()),
-			CloseReason::Abnormal => {
-				info!("Listener {} stopped unexpectedly", self.name.bright_green())
+			CloseReason::Normal => {
+				info!("Listener for {} stopped", self.name[len..].bright_green())
 			}
+			CloseReason::Abnormal => info!(
+				"Listener {} stopped unexpectedly",
+				self.name[len..].bright_green()
+			),
 		}
 	}
 
 	fn on_dropped(&self) {
-		info!("Listener {} lost connection. it will keep trying to restore connection in the background.", self.name.bright_green())
+		let len = self.name.len().saturating_sub(6);
+		info!("Listener {} lost connection. it will keep trying to restore connection in the background.", self.name[len..].bright_green())
 	}
 
 	fn on_reestablished(&self) {
+		let len = self.name.len().saturating_sub(6);
 		info!(
 			"Listener {} reestablished connection.",
-			self.name.bright_green(),
+			self.name[len..].bright_green(),
 		)
 	}
 }

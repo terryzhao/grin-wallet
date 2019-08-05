@@ -15,6 +15,7 @@
 use crate::cmd::wallet_args;
 use crate::config::GlobalWalletConfig;
 use clap::ArgMatches;
+use colored::*;
 use grin_wallet_config::WalletConfig;
 use grin_wallet_impls::{HTTPNodeClient, SEED_FILE};
 use grin_wallet_libwallet::NodeClient;
@@ -70,12 +71,13 @@ pub fn wallet_command(wallet_args: &ArgMatches<'_>, config: GlobalWalletConfig) 
 	thread::sleep(Duration::from_millis(100));
 
 	if let Err(e) = res {
-		println!("Wallet command failed: {}", e);
+		println!("Wallet command {}: {}", "failed".bright_red(), e);
 		1
 	} else {
 		println!(
-			"Command '{}' completed successfully",
-			wallet_args.subcommand().0
+			"Command '{}' completed {}",
+			wallet_args.subcommand().0,
+			"successfully".bright_green(),
 		);
 		0
 	}
