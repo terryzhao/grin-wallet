@@ -12,6 +12,7 @@ The main differences from the official Grin Wallet:
 - Provide mobile wallet APIs for mobile Apps developer.
   - Swift / ObjectiveC / React-Native [APIs for IOS](https://github.com/gottstech/cocoa_grinwallet/wiki)
   - Android (to be added)
+- The defaul wallet data folder is `~/.grin.w/`, instead of `~/.grin`.  
 
 # User Guide
 
