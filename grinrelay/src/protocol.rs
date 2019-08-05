@@ -15,27 +15,21 @@
 //! Grin Relay Protocol
 
 use colored::*;
+use failure::Fail;
 use std::fmt::{Display, Formatter, Result};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Fail, Serialize, Deserialize, Debug)]
 pub enum ProtocolError {
+	#[fail(display = "GrinRelay Protocol: unknown error")]
 	UnknownError,
+	#[fail(display = "GrinRelay Protocol: invalid request")]
 	InvalidRequest,
+	#[fail(display = "GrinRelay Protocol: invalid signature")]
 	InvalidSignature,
+	#[fail(display = "GrinRelay Protocol: invalid challenge")]
 	InvalidChallenge,
+	#[fail(display = "GrinRelay Protocol: too many subscriptions")]
 	TooManySubscriptions,
-}
-
-impl Display for ProtocolError {
-	fn fmt(&self, f: &mut Formatter) -> Result {
-		match *self {
-			ProtocolError::UnknownError => write!(f, "{}", "unknown error!"),
-			ProtocolError::InvalidRequest => write!(f, "{}", "invalid request!"),
-			ProtocolError::InvalidSignature => write!(f, "{}", "invalid signature!"),
-			ProtocolError::InvalidChallenge => write!(f, "{}", "invalid challenge!"),
-			ProtocolError::TooManySubscriptions => write!(f, "{}", "too many subscriptions!"),
-		}
-	}
 }
 
 #[derive(Serialize, Deserialize, Debug)]
