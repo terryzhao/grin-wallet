@@ -70,8 +70,9 @@ case "${CI_JOB}" in
         cd ./target/release/ || exit 1
         rm -f -- *"${PKG_SUFFIX}"
         ${ARCHIVE_CMD} "${PKG_NAME}${PKG_SUFFIX}" "grin-wallet${BIN_SUFFIX}"
-        ls -ls -- *.tgz | cut -d' ' -f6-
-        shasum "${PKG_NAME}${PKG_SUFFIX}" > "${PKG_NAME}${PKG_SUFFIX}-shasum.txt"
+        ls -ls -- *${PKG_SUFFIX} | cut -d' ' -f6-
+        [[ "$OS_NAME" = "linux" || "$OS_NAME" = "osx" ]] && shasum "${PKG_NAME}${PKG_SUFFIX}" > "${PKG_NAME}${PKG_SUFFIX}-shasum.txt"
+        [ "$OS_NAME" = "windows" ] && CertUtil -hashfile "${PKG_NAME}${PKG_SUFFIX}" SHA256 > "${PKG_NAME}${PKG_SUFFIX}-shasum.txt"
         ls -ls -- *-shasum.txt | cut -d' ' -f6-
         cd - > /dev/null || exit 1
 
