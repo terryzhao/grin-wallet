@@ -30,6 +30,7 @@ pub enum CloseReason {
 }
 
 pub trait Publisher: Send {
+	fn retrieve_relay_addr(&self, abbr: String) -> Result<()>;
 	fn post_slate(&self, slate: &VersionedSlate, to: &GrinboxAddress) -> Result<()>;
 }
 
@@ -44,6 +45,7 @@ pub trait Subscriber {
 pub trait SubscriptionHandler: Send {
 	fn on_open(&self);
 	fn on_slate(&self, from: &str, slate: &VersionedSlate, proof: Option<TxProof>);
+	fn on_relayaddr(&self, abbr: &str, fullname: Vec<String>);
 	fn on_close(&self, result: CloseReason);
 	fn on_dropped(&self);
 	fn on_reestablished(&self);
@@ -58,6 +60,7 @@ where
 	publisher: P,
 	relay_tx_as_payer: Option<Sender<(Slate, Option<TxProof>)>>,
 	relay_tx_as_payee: Option<Sender<(String, Slate)>>,
+	relay_addr_query: Option<Sender<(String, Vec<String>)>>,
 }
 
 impl<P> Controller<P>
@@ -69,12 +72,14 @@ where
 		publisher: P,
 		relay_tx_as_payer: Option<Sender<(Slate, Option<TxProof>)>>,
 		relay_tx_as_payee: Option<Sender<(String, Slate)>>,
+		relay_addr_query: Option<Sender<(String, Vec<String>)>>,
 	) -> Result<Self> {
 		Ok(Self {
 			name: name.to_string(),
 			publisher,
 			relay_tx_as_payer,
 			relay_tx_as_payee,
+			relay_addr_query,
 		})
 	}
 
@@ -133,6 +138,18 @@ where
 			}
 		}
 	}
+
+	fn process_resp_relayaddr(&self, abbr: &str, fullname: Vec<String>) {
+		if self.relay_addr_query.is_some() {
+			let _ = self
+				.relay_addr_query
+				.clone()
+				.unwrap()
+				.send((abbr.to_owned(), fullname.clone()));
+		} else {
+			debug!("process_resp_relayaddr: relay mpsc sender (relay addr query) missed.");
+		}
+	}
 }
 
 impl<P> SubscriptionHandler for Controller<P>
@@ -171,6 +188,10 @@ where
 			Ok(_) => {}
 			Err(e) => error!("{}", e),
 		}
+	}
+
+	fn on_relayaddr(&self, abbr: &str, fullname: Vec<String>) {
+		self.process_resp_relayaddr(abbr, fullname);
 	}
 
 	fn on_close(&self, reason: CloseReason) {

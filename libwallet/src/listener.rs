@@ -29,6 +29,8 @@ pub trait Listener: Sync + Send + 'static {
 	fn stop(self: Box<Self>) -> Result<()>;
 	/// Trait Clone Implementation
 	fn box_clone(&self) -> Box<Listener>;
+	/// Retrieve relay address
+	fn retrieve_relay_addr(&self, abbr: String) -> Result<()>;
 }
 
 impl Clone for Box<Listener> {

@@ -25,6 +25,7 @@ use grin_wallet_util::grin_core::global::is_mainnet;
 
 pub const GRINRELAY_PREFIX: &str = "grinrelay://";
 pub const GRINRELAY_ADDRESS_REGEX: &str = r"^(grinrelay://)?(?P<public_key>[0-9a-z\-]{62,67})(@(?P<domain>[a-zA-Z0-9\.]+)(:(?P<port>[0-9]*))?)?$";
+pub const GRINRELAY_SHORT_ADDRESS_REGEX: &str = r"[0|2-9|a|c-h|j-n|p-z]{6}";
 pub const GRINRELAY_ADDRESS_HRP_MAINNET: &str = "gn";
 pub const GRINRELAY_ADDRESS_HRP_TESTNET: &str = "tn";
 pub const DEFAULT_GRINRELAY_DOMAIN: &str = "relay.grin.icu";

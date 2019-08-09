@@ -40,7 +40,7 @@ use crate::error::ErrorKind;
 use crate::grin_util::secp::key::SecretKey;
 use crate::grin_util::Mutex;
 use crate::libwallet::TxProof;
-use crate::protocol::{ProtocolRequest, ProtocolResponse};
+use crate::protocol::{ProtocolError, ProtocolRequest, ProtocolResponse};
 use crate::tx_proof::TxProofImpl;
 use crate::types::{CloseReason, Controller, Publisher, Subscriber, SubscriptionHandler};
 use crate::Result;
@@ -60,6 +60,10 @@ pub struct GrinboxListener {
 impl Listener for GrinboxListener {
 	fn address(&self) -> String {
 		self.address.stripped()
+	}
+
+	fn retrieve_relay_addr(&self, abbr: String) -> Result<()> {
+		self.publisher.retrieve_relay_addr(abbr)
 	}
 
 	fn publish(&self, slate: &VersionedSlate, to: &String) -> Result<()> {
@@ -101,6 +105,11 @@ impl GrinboxPublisher {
 }
 
 impl Publisher for GrinboxPublisher {
+	fn retrieve_relay_addr(&self, abbr: String) -> Result<()> {
+		self.broker.retrieve_relay_addr(abbr)?;
+		Ok(())
+	}
+
 	fn post_slate(&self, slate: &VersionedSlate, to: &GrinboxAddress) -> Result<()> {
 		let to = GrinboxAddress::from_str(&to.to_string())?;
 		self.broker
@@ -181,6 +190,24 @@ impl GrinboxBroker {
 			protocol_unsecure,
 			selected_server: None,
 		})
+	}
+
+	fn retrieve_relay_addr(&self, abbr: String) -> Result<()> {
+		if !self.is_running() {
+			return Err(ErrorKind::ClosedListener("grinrelay".to_string()).into());
+		}
+
+		let request = ProtocolRequest::RetrieveRelayAddr { abbr };
+
+		if let Some(ref sender) = *self.inner.lock() {
+			sender
+				.send(serde_json::to_string(&request).unwrap())
+				.map_err(|_| {
+					ErrorKind::GenericError("failed retrieving relay_addr!".to_string()).into()
+				})
+		} else {
+			Err(ErrorKind::GenericError("failed retrieving relay_addr!".to_string()).into())
+		}
 	}
 
 	fn post_slate(
@@ -471,11 +498,24 @@ where
 
 				self.handler.lock().on_slate(&from, &slate, Some(tx_proof));
 			}
+			ProtocolResponse::RelayAddr { abbr, relay_addr } => {
+				self.handler.lock().on_relayaddr(abbr.as_str(), relay_addr);
+			}
 			ProtocolResponse::Error {
-				kind: _,
-				description: _,
+				kind: e_kind,
+				description: desc,
 			} => {
-				error!("{}", response);
+				match e_kind {
+					ProtocolError::InvalidRelayAbbr => {
+						error!("{}", "ProtocolError::InvalidRelayAbbr");
+						self.handler
+							.lock()
+							.on_relayaddr("parse relay addr failed!", vec![]);
+					}
+					_ => {
+						error!("{}", desc);
+					}
+				};
 			}
 			_ => {}
 		}

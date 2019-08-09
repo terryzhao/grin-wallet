@@ -26,10 +26,12 @@ use grin_wallet_impls::{instantiate_wallet, WalletSeed};
 use grin_wallet_libwallet::{
 	IssueInvoiceTxArgs, NodeClient, OutputStatus, TxLogEntryType, WalletInst,
 };
+use grin_wallet_relay::grinrelay_address::GRINRELAY_SHORT_ADDRESS_REGEX;
 use grin_wallet_util::grin_core as core;
 use grin_wallet_util::grin_keychain as keychain;
 use linefeed::terminal::Signal;
 use linefeed::{Interface, ReadResult};
+use regex::Regex;
 use rpassword;
 use std::io::Write;
 use std::path::Path;
@@ -549,6 +551,15 @@ pub fn parse_send_args(args: &ArgMatches) -> Result<command::SendArgs, ParseErro
 
 	if (dest.starts_with("tn1") || dest.starts_with("gn1")) && dest.len() >= 62 {
 		method = "relay";
+	}
+
+	if dest.len() == 6 {
+		let re = Regex::new(GRINRELAY_SHORT_ADDRESS_REGEX).unwrap();
+		let captures = re.captures(&dest);
+
+		if captures.is_some() {
+			method = "relay";
+		}
 	}
 
 	if !estimate_selection_strategies

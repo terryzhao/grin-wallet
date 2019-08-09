@@ -284,6 +284,7 @@ pub fn grinrelay_listener<T: ?Sized, C, K>(
 	grinrelay_config: GrinRelayConfig,
 	relay_tx_as_payer: Option<Sender<(Slate, Option<TxProof>)>>,
 	relay_tx_as_payee: Option<Sender<(String, Slate)>>,
+	relay_addr_query: Option<Sender<(String, Vec<String>)>>,
 ) -> Result<(u64, Box<dyn Listener>), Error>
 where
 	T: WalletBackend<C, K> + Send + Sync + 'static,
@@ -352,6 +353,7 @@ where
 			cpublisher,
 			relay_tx_as_payer,
 			relay_tx_as_payee,
+			relay_addr_query,
 		)
 		.expect("could not start grinrelay controller!");
 

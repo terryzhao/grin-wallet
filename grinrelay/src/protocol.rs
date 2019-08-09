@@ -28,6 +28,8 @@ pub enum ProtocolError {
 	InvalidSignature,
 	#[fail(display = "GrinRelay Protocol: invalid challenge")]
 	InvalidChallenge,
+	#[fail(display = "GrinRelay Protocol: invalid relay abbr")]
+	InvalidRelayAbbr,
 	#[fail(display = "GrinRelay Protocol: too many subscriptions")]
 	TooManySubscriptions,
 }
@@ -39,6 +41,9 @@ pub enum ProtocolRequest {
 	Subscribe {
 		address: String,
 		signature: String,
+	},
+	RetrieveRelayAddr {
+		abbr: String,
 	},
 	PostSlate {
 		from: String,
@@ -82,6 +87,12 @@ impl Display for ProtocolRequest {
 				from.bright_green(),
 				to.bright_green()
 			),
+			ProtocolRequest::RetrieveRelayAddr { ref abbr } => write!(
+				f,
+				"{}: {}",
+				"RetrieveRelayAddr".bright_purple(),
+				abbr.bright_green()
+			),
 		}
 	}
 }
@@ -103,6 +114,10 @@ pub enum ProtocolResponse {
 		signature: String,
 		challenge: String,
 	},
+	RelayAddr {
+		abbr: String,
+		relay_addr: Vec<String>,
+	},
 }
 
 impl Display for ProtocolResponse {
@@ -122,6 +137,16 @@ impl Display for ProtocolResponse {
 				signature: _,
 				challenge: _,
 			} => write!(f, "{} from {}", "Slate".cyan(), from.bright_green()),
+			ProtocolResponse::RelayAddr {
+				ref abbr,
+				ref relay_addr,
+			} => write!(
+				f,
+				"{}:  abbr: {}, relay_addr: {}",
+				"RelayAddr".cyan(),
+				abbr,
+				relay_addr[0]
+			),
 		}
 	}
 }

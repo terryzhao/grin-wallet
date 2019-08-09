@@ -19,8 +19,9 @@ use chrono::NaiveDateTime as DateTime;
 use colored::*;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{Read, Write};
+use std::io::{stdin, stdout, Read, Write};
 use std::sync::mpsc::channel;
+use std::sync::mpsc::TryRecvError;
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -158,6 +159,7 @@ pub fn listen(config: &WalletConfig, args: &ListenArgs, g_args: &GlobalArgs) -> 
 						config.grinrelay_config.clone().unwrap_or_default(),
 						None,
 						Some(relay_tx_as_payee),
+						None,
 					)?;
 
 					(
@@ -270,6 +272,37 @@ pub struct SendArgs {
 	pub target_slate_version: Option<u16>,
 }
 
+/// Prompts for a password on STDOUT and reads it from STDIN
+pub fn prompt_relayaddr_stdout(relay_addr: &str) -> std::io::Result<String> {
+	let mut s = String::new();
+	write!(
+		stdout(),
+		"{} online address found: {}\n",
+		"One".bright_blue(),
+		relay_addr.bright_green()
+	)?;
+
+	write!(
+		stdout(),
+		"Do you confirm this is the correct address and continue to send? [{}/{}]",
+		"y".bright_green(),
+		"N".bright_red()
+	)?;
+
+	let _ = stdout().flush();
+	stdin()
+		.read_line(&mut s)
+		.expect("Did not enter a correct string");
+	if let Some('\n') = s.chars().next_back() {
+		s.pop();
+	}
+	if let Some('\r') = s.chars().next_back() {
+		s.pop();
+	}
+
+	Ok(s)
+}
+
 pub fn send(
 	wallet: Arc<Mutex<WalletInst<impl NodeClient + 'static, keychain::ExtKeychain>>>,
 	args: SendArgs,
@@ -282,17 +315,101 @@ pub fn send(
 
 	let mut grinrelay_listener: Option<Box<Listener>> = None;
 	let mut grinrelay_key_path: Option<u64> = None;
+	let mut long_dest = args.dest.clone();
+
 	if "relay" == args.method.as_str() {
+		let (relay_addr_query_sender, relay_addr_query_rx) = channel();
+
 		// Start a Grin Relay service firstly
 		let (key_path, listener) = controller::grinrelay_listener(
 			wallet.clone(),
 			wallet_config.grinrelay_config.clone().unwrap_or_default(),
 			Some(relay_tx_as_payer),
 			None,
+			Some(relay_addr_query_sender),
 		)?;
 		grinrelay_listener = Some(listener);
 		grinrelay_key_path = Some(key_path);
 		thread::sleep(Duration::from_millis(1_000));
+
+		let abbr = long_dest.clone();
+		let abbr_clone = abbr.clone();
+		if 6 == abbr.len() {
+			let mut vec_fullname: Option<Vec<String>> = None;
+			let mut query_status;
+			let resp = grinrelay_listener
+				.to_owned()
+				.unwrap()
+				.retrieve_relay_addr(abbr);
+
+			if resp.is_err() {
+				write!(
+					stdout(),
+					"{}\n",
+					"Sending query realy addr request failed!\n".bright_yellow()
+				)
+				.expect("cannot write to stdout");
+				std::process::exit(1);
+			}
+
+			let mut cnt = 0;
+			const TTL: u16 = 10;
+			loop {
+				match relay_addr_query_rx.try_recv() {
+					Ok(s) => {
+						if s.1.is_empty() {
+							query_status = false;
+						} else {
+							vec_fullname = Some(s.1);
+							query_status = true;
+						}
+						break;
+					}
+					Err(TryRecvError::Disconnected) => {
+						query_status = false;
+						break;
+					}
+					Err(TryRecvError::Empty) => {
+						query_status = false;
+					}
+				}
+				cnt += 1;
+				if cnt > TTL * 10 {
+					info!(
+						"{} from recipient. {}s timeout",
+						"No response".bright_blue(),
+						TTL
+					);
+					break;
+				}
+				thread::sleep(Duration::from_millis(100));
+			}
+
+			if !query_status {
+				error!("cannot find relay addr for {}", abbr_clone);
+				return Err(ErrorKind::ArgumentError("wrong relay address!".into()))?;
+			} else {
+				if vec_fullname.is_some() {
+					let vec_fn = vec_fullname.unwrap();
+					let len = vec_fn.len();
+
+					if len == 1 {
+						long_dest = vec_fn[0].clone();
+						let result = prompt_relayaddr_stdout(long_dest.as_str());
+						let ret_str = result.unwrap();
+
+						if "y" != ret_str && "Y" != ret_str {
+							write!(stdout(), "{}\n", "Send Cancelled\n".bright_yellow())
+								.expect("cannot write to stdout");
+							std::process::exit(1);
+						}
+					}
+				} else {
+					error!("Error relay address, Exit!!!");
+					return Err(ErrorKind::ArgumentError("wrong relay address!".into()))?;
+				}
+			}
+		}
 	}
 
 	controller::owner_single_use(wallet.clone(), |api| {
@@ -352,8 +469,10 @@ pub fn send(
 				"self" => NullWalletCommAdapter::new(),
 				_ => NullWalletCommAdapter::new(),
 			};
+
 			if adapter.supports_sync() {
-				let (returned_slate, tx_proof) = adapter.send_tx_sync(&args.dest, &slate)?;
+				let (returned_slate, tx_proof) =
+					adapter.send_tx_sync(long_dest.as_str(), &slate)?;
 				slate = returned_slate;
 				api.tx_lock_outputs(&slate, 0)?;
 				if args.method == "self" {
@@ -368,7 +487,7 @@ pub fn send(
 				}
 				slate = api.finalize_tx(&slate, tx_proof, grinrelay_key_path)?;
 			} else {
-				adapter.send_tx_async(&args.dest, &slate)?;
+				adapter.send_tx_async(long_dest.as_str(), &slate)?;
 				api.tx_lock_outputs(&slate, 0)?;
 			}
 			if adapter.supports_sync() {
