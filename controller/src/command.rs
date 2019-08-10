@@ -277,16 +277,14 @@ pub fn prompt_relayaddr_stdout(relay_addr: &str) -> std::io::Result<String> {
 	let mut s = String::new();
 	write!(
 		stdout(),
-		"{} online address found: {}\n",
-		"One".bright_blue(),
-		relay_addr.bright_green()
+		"One online address matched: {}\n",
+		relay_addr.bright_blue()
 	)?;
 
 	write!(
 		stdout(),
-		"Do you confirm this is the correct address and continue to send? [{}/{}]",
-		"y".bright_green(),
-		"N".bright_red()
+		"Do you confirm this is the correct address and continue to send? [{}]: ",
+		"y/N".bright_blue(),
 	)?;
 
 	let _ = stdout().flush();
@@ -315,7 +313,7 @@ pub fn send(
 
 	let mut grinrelay_listener: Option<Box<Listener>> = None;
 	let mut grinrelay_key_path: Option<u64> = None;
-	let mut long_dest = args.dest.clone();
+	let mut dest = args.dest.clone();
 
 	if "relay" == args.method.as_str() {
 		let (relay_addr_query_sender, relay_addr_query_rx) = channel();
@@ -328,86 +326,94 @@ pub fn send(
 			None,
 			Some(relay_addr_query_sender),
 		)?;
-		grinrelay_listener = Some(listener);
+
+		// Wait for connecting with relay service
+		let mut wait_time = 0;
+		while !listener.is_connected() {
+			thread::sleep(Duration::from_millis(100));
+			wait_time += 1;
+			if wait_time > 50 {
+				println!(
+					"{} to connect with grin relay service, 5s timeout. please try again later",
+					"Fail".bright_red(),
+				);
+				std::process::exit(1);
+			}
+		}
+		grinrelay_listener = Some(listener.clone());
 		grinrelay_key_path = Some(key_path);
-		thread::sleep(Duration::from_millis(1_000));
 
-		let abbr = long_dest.clone();
-		let abbr_clone = abbr.clone();
-		if 6 == abbr.len() {
-			let mut vec_fullname: Option<Vec<String>> = None;
-			let mut query_status;
-			let resp = grinrelay_listener
-				.to_owned()
-				.unwrap()
-				.retrieve_relay_addr(abbr);
-
-			if resp.is_err() {
-				write!(
-					stdout(),
-					"{}\n",
-					"Sending query realy addr request failed!\n".bright_yellow()
-				)
-				.expect("cannot write to stdout");
+		// Conversion the abbreviation address to the full address
+		if 6 == dest.len() {
+			let abbr = dest.clone();
+			if listener.retrieve_relay_addr(abbr).is_err() {
+				println!(
+					"{} {}",
+					"Fail".bright_red(),
+					"to send query request for abbreviated relay addr!\n"
+				);
 				std::process::exit(1);
 			}
 
-			let mut cnt = 0;
 			const TTL: u16 = 10;
+			let mut addresses: Option<Vec<String>> = None;
+			let mut cnt = 0;
 			loop {
 				match relay_addr_query_rx.try_recv() {
-					Ok(s) => {
-						if s.1.is_empty() {
-							query_status = false;
-						} else {
-							vec_fullname = Some(s.1);
-							query_status = true;
+					Ok((_abbr, addrs)) => {
+						if !addrs.is_empty() {
+							addresses = Some(addrs);
 						}
 						break;
 					}
-					Err(TryRecvError::Disconnected) => {
-						query_status = false;
-						break;
-					}
-					Err(TryRecvError::Empty) => {
-						query_status = false;
-					}
+					Err(TryRecvError::Disconnected) => break,
+					Err(TryRecvError::Empty) => {}
 				}
 				cnt += 1;
 				if cnt > TTL * 10 {
 					info!(
-						"{} from recipient. {}s timeout",
+						"{} from relay server for address query. {}s timeout",
 						"No response".bright_blue(),
 						TTL
 					);
-					break;
+					return Err(ErrorKind::GenericError(
+						"relay server no response, please try again later".into(),
+					))?;
 				}
 				thread::sleep(Duration::from_millis(100));
 			}
 
-			if !query_status {
-				error!("cannot find relay addr for {}", abbr_clone);
-				return Err(ErrorKind::ArgumentError("wrong relay address!".into()))?;
-			} else {
-				if vec_fullname.is_some() {
-					let vec_fn = vec_fullname.unwrap();
-					let len = vec_fn.len();
-
-					if len == 1 {
-						long_dest = vec_fn[0].clone();
-						let result = prompt_relayaddr_stdout(long_dest.as_str());
+			if let Some(addresses) = addresses {
+				match addresses.len() {
+					0 => {
+						return Err(ErrorKind::ArgumentError(
+							"wrong address, or destination is offline".into(),
+						))?;
+					}
+					1 => {
+						dest = addresses.first().unwrap().clone();
+						let result = prompt_relayaddr_stdout(dest.as_str());
 						let ret_str = result.unwrap();
 
 						if "y" != ret_str && "Y" != ret_str {
-							write!(stdout(), "{}\n", "Send Cancelled\n".bright_yellow())
-								.expect("cannot write to stdout");
+							println!("{}", "Send Cancelled\n".bright_yellow());
 							std::process::exit(1);
 						}
 					}
-				} else {
-					error!("Error relay address, Exit!!!");
-					return Err(ErrorKind::ArgumentError("wrong relay address!".into()))?;
+					_ => {
+						println!("{} because of risk for abbreviated address conflict. Please use the full address instead of the short abbr addr", "Send Cancelled".bright_yellow());
+						println!(
+							"{} addresses matched the same abbreviation address: {:?}",
+							addresses.len().to_string().bright_red(),
+							addresses,
+						);
+						std::process::exit(1);
+					}
 				}
+			} else {
+				return Err(ErrorKind::ArgumentError(
+					"wrong address, or destination is offline".into(),
+				))?;
 			}
 		}
 	}
@@ -471,8 +477,7 @@ pub fn send(
 			};
 
 			if adapter.supports_sync() {
-				let (returned_slate, tx_proof) =
-					adapter.send_tx_sync(long_dest.as_str(), &slate)?;
+				let (returned_slate, tx_proof) = adapter.send_tx_sync(dest.as_str(), &slate)?;
 				slate = returned_slate;
 				api.tx_lock_outputs(&slate, 0)?;
 				if args.method == "self" {
@@ -487,7 +492,7 @@ pub fn send(
 				}
 				slate = api.finalize_tx(&slate, tx_proof, grinrelay_key_path)?;
 			} else {
-				adapter.send_tx_async(long_dest.as_str(), &slate)?;
+				adapter.send_tx_async(dest.as_str(), &slate)?;
 				api.tx_lock_outputs(&slate, 0)?;
 			}
 			if adapter.supports_sync() {

@@ -32,6 +32,8 @@ pub enum ProtocolError {
 	InvalidRelayAbbr,
 	#[fail(display = "GrinRelay Protocol: too many subscriptions")]
 	TooManySubscriptions,
+	#[fail(display = "GrinRelay Protocol: not online")]
+	Offline,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

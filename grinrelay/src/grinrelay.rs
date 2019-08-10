@@ -62,10 +62,6 @@ impl Listener for GrinboxListener {
 		self.address.stripped()
 	}
 
-	fn retrieve_relay_addr(&self, abbr: String) -> Result<()> {
-		self.publisher.retrieve_relay_addr(abbr)
-	}
-
 	fn publish(&self, slate: &VersionedSlate, to: &String) -> Result<()> {
 		let address = GrinboxAddress::from_str(to)?;
 		self.publisher.post_slate(slate, &address)
@@ -80,6 +76,14 @@ impl Listener for GrinboxListener {
 
 	fn box_clone(&self) -> Box<Listener> {
 		Box::new((*self).clone())
+	}
+
+	fn retrieve_relay_addr(&self, abbr: String) -> Result<()> {
+		self.publisher.retrieve_relay_addr(abbr)
+	}
+
+	fn is_connected(&self) -> bool {
+		self.publisher.is_connected()
 	}
 }
 
@@ -115,6 +119,10 @@ impl Publisher for GrinboxPublisher {
 		self.broker
 			.post_slate(slate, &to, &self.address, &self.secret_key)?;
 		Ok(())
+	}
+
+	fn is_connected(&self) -> bool {
+		self.broker.is_running()
 	}
 }
 
@@ -505,16 +513,15 @@ where
 				kind: e_kind,
 				description: desc,
 			} => {
+				error!("{}", desc);
 				match e_kind {
-					ProtocolError::InvalidRelayAbbr => {
-						error!("{}", "ProtocolError::InvalidRelayAbbr");
+					ProtocolError::InvalidRelayAbbr | ProtocolError::Offline => {
+						// giving a fake empty response here, to avoid caller wait timeout
 						self.handler
 							.lock()
-							.on_relayaddr("parse relay addr failed!", vec![]);
+							.on_relayaddr("a fake empty response", vec![]);
 					}
-					_ => {
-						error!("{}", desc);
-					}
+					_ => {}
 				};
 			}
 			_ => {}

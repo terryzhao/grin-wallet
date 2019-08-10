@@ -32,6 +32,7 @@ pub enum CloseReason {
 pub trait Publisher: Send {
 	fn retrieve_relay_addr(&self, abbr: String) -> Result<()>;
 	fn post_slate(&self, slate: &VersionedSlate, to: &GrinboxAddress) -> Result<()>;
+	fn is_connected(&self) -> bool;
 }
 
 pub trait Subscriber {

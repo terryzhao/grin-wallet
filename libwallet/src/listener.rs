@@ -31,6 +31,8 @@ pub trait Listener: Sync + Send + 'static {
 	fn box_clone(&self) -> Box<Listener>;
 	/// Retrieve relay address
 	fn retrieve_relay_addr(&self, abbr: String) -> Result<()>;
+	/// Is connected
+	fn is_connected(&self) -> bool;
 }
 
 impl Clone for Box<Listener> {
