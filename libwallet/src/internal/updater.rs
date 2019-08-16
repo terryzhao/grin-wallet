@@ -159,7 +159,8 @@ where
 				true => {
 					!tx_entry.confirmed
 						&& (tx_entry.tx_type == TxLogEntryType::TxReceived
-							|| tx_entry.tx_type == TxLogEntryType::TxSent)
+							|| tx_entry.tx_type == TxLogEntryType::TxSent
+							|| tx_entry.tx_type == TxLogEntryType::TxSentCancelled)
 				}
 				false => true,
 			};
@@ -254,13 +255,19 @@ where
 	let mut batch = wallet.batch()?;
 
 	for mut o in outputs {
-		// unlock locked outputs
-		if o.status == OutputStatus::Unconfirmed {
-			batch.delete(&o.key_id, &o.mmr_index)?;
-		}
-		if o.status == OutputStatus::Locked {
-			o.status = OutputStatus::Unspent;
-			batch.save(o)?;
+		match o.status {
+			OutputStatus::Unconfirmed => batch.delete(&o.key_id, &o.mmr_index)?,
+			OutputStatus::Locked => {
+				// unlock locked outputs
+				o.status = OutputStatus::Unspent;
+				batch.save(o)?;
+			}
+			OutputStatus::Spent => {
+				//assert_eq!(o.is_change, Some(true));
+				o.status = OutputStatus::Unconfirmed;
+				batch.save(o)?;
+			}
+			_ => {}
 		}
 	}
 	let mut tx = tx.clone();
