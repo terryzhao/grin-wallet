@@ -1,7 +1,7 @@
-name: grin-wallet
-version: "2.0.1-beta.1"
-about: Reference Grin Wallet
-author: The Grin Team
+name: GrinWallet+
+version: "2.0.1-beta.2"
+about: Grin Wallet with Embedded Relay Address Service.
+author: The Grin & Gotts Team.
 
 args:
   - floonet:
