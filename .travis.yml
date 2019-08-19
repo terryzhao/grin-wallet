@@ -83,6 +83,8 @@ script:
 
 before_cache:
 - rm -rf $TRAVIS_BUILD_DIR/target/tmp
+- rm -rf $TRAVIS_BUILD_DIR/target/test_output
+- rm -rf $TRAVIS_BUILD_DIR/controller/test_output
 
 before_deploy:
 - bash .ci/release-jobs
