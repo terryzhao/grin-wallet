@@ -17,6 +17,7 @@
 
 use futures::{stream, Stream};
 
+use crate::core::core::TxKernelApiEntry;
 use crate::libwallet::{NodeClient, NodeVersionInfo, TxWrapper};
 use std::collections::HashMap;
 use tokio::runtime::Runtime;
@@ -173,6 +174,51 @@ impl NodeClient for HTTPNodeClient {
 			}
 		}
 		Ok(api_outputs)
+	}
+
+	/// retrieve a list of tx kernels from the specified grin node
+	fn get_tx_kernels_from_node(
+		&self,
+		wallet_kernels_keys: Vec<String>,
+	) -> Result<HashMap<pedersen::Commitment, TxKernelApiEntry>, libwallet::Error> {
+		let addr = self.node_url();
+		// build the necessary query params -
+		// ?id=xxx&id=yyy&id=zzz
+		let query_params: Vec<String> = wallet_kernels_keys
+			.iter()
+			.map(|excess| format!("id={}", excess))
+			.collect();
+
+		// build a map of api outputs by commit so we can look them up efficiently
+		let mut api_tx_kernels: HashMap<pedersen::Commitment, TxKernelApiEntry> = HashMap::new();
+		let mut tasks = Vec::new();
+
+		for query_chunk in query_params.chunks(200) {
+			let url = format!("{}/v1/chain/kernels/byids?{}", addr, query_chunk.join("&"),);
+			tasks.push(api::client::get_async::<Vec<TxKernelApiEntry>>(
+				url.as_str(),
+				self.node_api_secret(),
+			));
+		}
+
+		let task = stream::futures_unordered(tasks).collect();
+
+		let mut rt = Runtime::new().unwrap();
+		let results = match rt.block_on(task) {
+			Ok(tx_kernels) => tx_kernels,
+			Err(e) => {
+				let report = format!("Getting tx kernels by id: {}", e);
+				error!("Tx kernels by id failed: {}", e);
+				return Err(libwallet::ErrorKind::ClientCallback(report).into());
+			}
+		};
+
+		for res in results {
+			for out in res {
+				api_tx_kernels.insert(out.kernel.excess, out);
+			}
+		}
+		Ok(api_tx_kernels)
 	}
 
 	fn get_outputs_by_pmmr_index(

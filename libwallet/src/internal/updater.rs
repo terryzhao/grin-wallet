@@ -20,7 +20,7 @@ use uuid::Uuid;
 
 use crate::error::Error;
 use crate::grin_core::consensus::reward;
-use crate::grin_core::core::{Output, TxKernel};
+use crate::grin_core::core::{Output, TxKernel, TxKernelApiEntry};
 use crate::grin_core::global;
 use crate::grin_core::libtx::proof::ProofBuilder;
 use crate::grin_core::libtx::reward;
@@ -134,6 +134,7 @@ pub fn retrieve_txs<T: ?Sized, C, K>(
 	tx_slate_id: Option<Uuid>,
 	parent_key_id: Option<&Identifier>,
 	outstanding_only: bool,
+	tx_type: Option<TxLogEntryType>,
 ) -> Result<Vec<TxLogEntry>, Error>
 where
 	T: WalletBackend<C, K>,
@@ -164,7 +165,11 @@ where
 				}
 				false => true,
 			};
-			f_pk && f_tx_id && f_txs && f_outstanding
+			let f_tx_type = match &tx_type {
+				Some(t) => tx_entry.tx_type == *t,
+				None => true,
+			};
+			f_pk && f_tx_id && f_txs && f_outstanding && f_tx_type
 		})
 		.collect();
 	txs.sort_by_key(|tx| tx.creation_ts);
@@ -208,7 +213,7 @@ where
 		.filter(|x| x.root_key_id == *parent_key_id && x.status != OutputStatus::Spent)
 		.collect();
 
-	let tx_entries = retrieve_txs(wallet, None, None, Some(&parent_key_id), true)?;
+	let tx_entries = retrieve_txs(wallet, None, None, Some(&parent_key_id), true, None)?;
 
 	// Only select outputs that are actually involved in an outstanding transaction
 	let unspents: Vec<OutputData> = match update_all {
@@ -376,6 +381,95 @@ where
 	Ok(())
 }
 
+/// Apply refreshed API tx kernels data to the wallet
+pub fn apply_api_tx_kernels<T: ?Sized, C, K>(
+	wallet: &mut T,
+	tx_entries: Vec<TxLogEntry>,
+	api_tx_kernels: &HashMap<pedersen::Commitment, TxKernelApiEntry>,
+	height: u64,
+	parent_key_id: &Identifier,
+) -> Result<(), Error>
+where
+	T: WalletBackend<C, K>,
+	C: NodeClient,
+	K: Keychain,
+{
+	// now find the transaction in the wallet and the corresponding
+	// api tx kernels (if it exists) and refresh it in-place in the wallet.
+	// Note: minimizing the time we spend holding the wallet lock.
+	{
+		let last_confirmed_height = wallet.last_confirmed_height()?;
+		// If the server height is less than our confirmed height, don't apply
+		// these changes as the chain is syncing, incorrect or forking
+		if height < last_confirmed_height {
+			warn!("apply_api_tx_kernels ignored. node is syncing?");
+			return Ok(());
+		}
+		let mut batch = wallet.batch()?;
+		for mut tx_entry in tx_entries {
+			if let Some(excess) = tx_entry.kernel_excess.clone() {
+				if let Ok(excess) = util::from_hex(excess) {
+					let excess = pedersen::Commitment::from_vec(excess);
+					match api_tx_kernels.get(&excess) {
+						Some(tx_kernel_api_entry) => {
+							// mark the output/s involved as confirmed
+							let outputs = batch
+								.iter()
+								.filter(|out| out.tx_log_entry == Some(tx_entry.id))
+								.collect::<Vec<_>>();
+							for mut output in outputs {
+								match output.status {
+									// for transaction output/s
+									OutputStatus::Unconfirmed => {
+										output.mark_unspent();
+										output.height = tx_kernel_api_entry.height;
+										batch.save(output)?;
+									}
+									// for transaction input/s
+									OutputStatus::Locked => {
+										output.mark_spent();
+										output.height = tx_kernel_api_entry.height;
+										batch.save(output)?;
+									}
+									_ => {}
+								}
+
+								// refresh the payment log
+								if let Some(slate_id) = tx_entry.tx_slate_id {
+									if let Ok(commits) = batch.get_payment_commits(&slate_id) {
+										for commit in commits.commits {
+											if let Ok(mut payment) =
+												batch.get_payment_log_entry(commit.clone())
+											{
+												payment.height = tx_kernel_api_entry.height;
+												payment.mark_confirmed();
+												batch.save_payment(payment)?;
+											}
+										}
+									}
+								}
+							}
+
+							// also mark the transaction as confirmed
+							// todo: use packaged block time instead of local time.
+							tx_entry.update_confirmation_ts();
+							tx_entry.confirmed = true;
+							batch.save_tx_log_entry(tx_entry, &parent_key_id)?;
+						}
+						None => {}
+					};
+				}
+			}
+		}
+		{
+			// Note: don't do this, instead, leave the 'apply_api_outputs' to update this.
+			// batch.save_last_confirmed_height(parent_key_id, height)?;
+		}
+		batch.commit()?;
+	}
+	Ok(())
+}
+
 /// Builds a single api query to retrieve the latest output data from the node.
 /// So we can refresh the local wallet outputs.
 fn refresh_output_state<T: ?Sized, C, K>(
@@ -391,16 +485,54 @@ where
 {
 	debug!("Refreshing wallet outputs");
 
-	// build a local map of wallet outputs keyed by commit
-	// and a list of outputs we want to query the node for
-	let wallet_outputs = map_wallet_outputs(wallet, parent_key_id, update_all)?;
+	// Firstly, query the sending tx kernel/s to refresh the txs state
+	// Notes:
+	//	1. This ONLY works for sending transactions (because we don't know the tx kernel for receiving tx)
+	//  2. There's time limitation for this refreshing
+	//		- ONLY works for the transactions happened in 2 days.
+	//		- Normally also works for transactions happened in 2 weeks (non-archive mode node).
+	//		- Depending on the node status of tx kernel mmr position index, which is configurable.
+	{
+		let tx_entries = retrieve_txs(
+			wallet,
+			None,
+			None,
+			Some(&parent_key_id),
+			true,
+			Some(TxLogEntryType::TxSent),
+		)?;
+		let wallet_kernels_keys = tx_entries
+			.iter()
+			.filter(|tx_entry| tx_entry.kernel_excess.is_some())
+			.map(|tx| tx.kernel_excess.clone().unwrap())
+			.collect();
 
-	let wallet_output_keys = wallet_outputs.keys().map(|commit| commit.clone()).collect();
+		let api_tx_kernels = wallet
+			.w2n_client()
+			.get_tx_kernels_from_node(wallet_kernels_keys)?;
+		if api_tx_kernels.len() > 0 {
+			apply_api_tx_kernels(wallet, tx_entries, &api_tx_kernels, height, parent_key_id)?;
+		}
+	}
 
-	let api_outputs = wallet
-		.w2n_client()
-		.get_outputs_from_node(wallet_output_keys)?;
-	apply_api_outputs(wallet, &wallet_outputs, &api_outputs, height, parent_key_id)?;
+	// Secondly, query the output/s existence in the chain UTXO sets to refresh the txs state.
+	// Note:
+	//	1. Normally, after above tx kernel querying, this should only update the receiving transaction state.
+	//	2. But for some cases, when a transaction is old (2 weeks ago for example), the node could not
+	//		have the tx kernel mmr position index, if one of the transaction outputs is still unspent,
+	//		this query will work.
+	{
+		// build a local map of wallet outputs keyed by commit
+		// and a list of outputs we want to query the node for
+		let wallet_outputs = map_wallet_outputs(wallet, parent_key_id, update_all)?;
+
+		let wallet_output_keys = wallet_outputs.keys().map(|commit| commit.clone()).collect();
+
+		let api_outputs = wallet
+			.w2n_client()
+			.get_outputs_from_node(wallet_output_keys)?;
+		apply_api_outputs(wallet, &wallet_outputs, &api_outputs, height, parent_key_id)?;
+	}
 	clean_old_unconfirmed(wallet, height)?;
 	Ok(())
 }

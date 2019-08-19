@@ -128,7 +128,14 @@ where
 
 	Ok((
 		validated,
-		updater::retrieve_txs(&mut *w, tx_id, tx_slate_id, Some(&parent_key_id), false)?,
+		updater::retrieve_txs(
+			&mut *w,
+			tx_id,
+			tx_slate_id,
+			Some(&parent_key_id),
+			false,
+			None,
+		)?,
 	))
 }
 
@@ -317,6 +324,7 @@ where
 		Some(ret_slate.id),
 		Some(&parent_key_id),
 		use_test_rng,
+		Some(TxLogEntryType::TxSent),
 	)?;
 	for t in &tx {
 		if t.tx_type == TxLogEntryType::TxSent {

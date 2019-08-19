@@ -17,7 +17,7 @@
 
 use crate::error::{Error, ErrorKind};
 use crate::grin_core::core::hash::Hash;
-use crate::grin_core::core::Transaction;
+use crate::grin_core::core::{Transaction, TxKernelApiEntry};
 use crate::grin_core::libtx::{aggsig, secp_ser};
 use crate::grin_core::ser;
 use crate::grin_keychain::{Identifier, Keychain};
@@ -293,6 +293,12 @@ pub trait NodeClient: Sync + Send + Clone {
 		&self,
 		wallet_outputs: Vec<pedersen::Commitment>,
 	) -> Result<HashMap<pedersen::Commitment, (String, u64, u64)>, Error>;
+
+	/// retrieve a list of tx kernels from the specified grin node
+	fn get_tx_kernels_from_node(
+		&self,
+		wallet_kernels_keys: Vec<String>,
+	) -> Result<HashMap<pedersen::Commitment, TxKernelApiEntry>, Error>;
 
 	/// Get a list of outputs from the node by traversing the UTXO
 	/// set in PMMR index order.
@@ -829,6 +835,8 @@ pub struct TxLogEntry {
 	/// Grin Relay address path|index used for sending this tx
 	#[serde(with = "secp_ser::opt_string_or_u64")]
 	pub grinrelay_key_path: Option<u64>,
+	/// Transaction Kernel Public Excess
+	pub kernel_excess: Option<String>,
 }
 
 impl ser::Writeable for TxLogEntry {
@@ -863,6 +871,7 @@ impl TxLogEntry {
 			messages: None,
 			stored_tx: None,
 			grinrelay_key_path: None,
+			kernel_excess: None,
 		}
 	}
 

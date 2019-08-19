@@ -19,7 +19,7 @@ use uuid::Uuid;
 use crate::grin_core::consensus::valid_header_version;
 use crate::grin_core::core::HeaderVersion;
 use crate::grin_keychain::{Identifier, Keychain};
-use crate::grin_util::Mutex;
+use crate::grin_util::{to_hex, Mutex};
 use crate::internal::{selection, updater};
 use crate::slate::Slate;
 use crate::types::{Context, NodeClient, TxLogEntryType, TxProof, WalletBackend};
@@ -271,7 +271,14 @@ where
 	} else if let Some(tx_slate_id) = tx_slate_id {
 		tx_id_string = tx_slate_id.to_string();
 	}
-	let tx_vec = updater::retrieve_txs(wallet, tx_id, tx_slate_id, Some(&parent_key_id), false)?;
+	let tx_vec = updater::retrieve_txs(
+		wallet,
+		tx_id,
+		tx_slate_id,
+		Some(&parent_key_id),
+		false,
+		None,
+	)?;
 	if tx_vec.len() != 1 {
 		return Err(ErrorKind::TransactionDoesntExist(tx_id_string))?;
 	}
@@ -302,7 +309,7 @@ where
 	K: Keychain,
 {
 	// finalize command
-	let tx_vec = updater::retrieve_txs(wallet, None, Some(slate.id), None, false)?;
+	let tx_vec = updater::retrieve_txs(wallet, None, Some(slate.id), None, false, None)?;
 	let mut tx = None;
 	// don't want to assume this is the right tx, in case of self-sending
 	for t in tx_vec {
@@ -338,7 +345,7 @@ where
 	C: NodeClient,
 	K: Keychain,
 {
-	let tx_vec = updater::retrieve_txs(wallet, None, Some(slate.id), None, false)?;
+	let tx_vec = updater::retrieve_txs(wallet, None, Some(slate.id), None, false, None)?;
 	if tx_vec.is_empty() {
 		return Err(ErrorKind::TransactionDoesntExist(slate.id.to_string()))?;
 	}
@@ -346,6 +353,9 @@ where
 	for mut tx in tx_vec.into_iter() {
 		tx.messages = Some(slate.participant_messages());
 		tx.grinrelay_key_path = grinrelay_key_path;
+		if let Some(tx_kernel) = slate.tx.body.kernels.first() {
+			tx.kernel_excess = Some(to_hex(tx_kernel.excess.as_ref().to_vec()));
+		}
 		let parent_key = tx.parent_key_id.clone();
 		batch.save_tx_log_entry(tx, &parent_key)?;
 	}

@@ -21,7 +21,7 @@ use crate::chain::types::NoopAdapter;
 use crate::chain::Chain;
 use crate::config::WalletConfig;
 use crate::core::core::verifier_cache::LruVerifierCache;
-use crate::core::core::Transaction;
+use crate::core::core::{Transaction, TxKernelApiEntry};
 use crate::core::global::{set_mining_mode, ChainTypes};
 use crate::core::{pow, ser};
 use crate::keychain::Keychain;
@@ -150,6 +150,7 @@ where
 				"get_outputs_by_pmmr_index" => self.get_outputs_by_pmmr_index(m)?,
 				"send_tx_slate" => self.send_tx_slate(m)?,
 				"post_tx" => self.post_tx(m)?,
+				"get_tx_kernels_from_node" => self.get_tx_kernels_from_node(m)?,
 				_ => panic!("Unknown Wallet Proxy Message"),
 			};
 
@@ -210,7 +211,7 @@ where
 		let mut slate = serde_json::from_str(&m.body).context(
 			libwallet::ErrorKind::ClientCallback("Error parsing TxWrapper".to_owned()),
 		)?;
-;
+
 		{
 			let mut w = wallet.1.lock();
 			w.open_with_credentials()?;
@@ -265,6 +266,33 @@ where
 			dest: m.sender_id,
 			method: m.method,
 			body: serde_json::to_string(&outputs).unwrap(),
+		})
+	}
+
+	/// get api kernels
+	fn get_tx_kernels_from_node(
+		&mut self,
+		m: WalletProxyMessage,
+	) -> Result<WalletProxyMessage, libwallet::Error> {
+		let split = m.body.split(",");
+		let mut tx_kernels: Vec<TxKernelApiEntry> = vec![];
+		for o in split {
+			let o_str = String::from(o);
+			if o_str.len() == 0 {
+				continue;
+			}
+			let c = util::from_hex(o_str).unwrap();
+			let excess = Commitment::from_vec(c);
+			let tx_kernel = self.chain.get_txkernel_by_excess(&excess);
+			if let Ok(k) = tx_kernel {
+				tx_kernels.push(k);
+			}
+		}
+		Ok(WalletProxyMessage {
+			sender_id: "node".to_owned(),
+			dest: m.sender_id,
+			method: m.method,
+			body: serde_json::to_string(&tx_kernels).unwrap(),
 		})
 	}
 
@@ -488,6 +516,36 @@ impl NodeClient for LocalWalletClient {
 			);
 		}
 		Ok(api_outputs)
+	}
+
+	/// retrieve a list of tx kernels from the specified grin node
+	fn get_tx_kernels_from_node(
+		&self,
+		wallet_kernels_keys: Vec<String>,
+	) -> Result<HashMap<pedersen::Commitment, TxKernelApiEntry>, libwallet::Error> {
+		let mut api_tx_kernels: HashMap<pedersen::Commitment, TxKernelApiEntry> = HashMap::new();
+		let query_str = wallet_kernels_keys.join(",");
+
+		let m = WalletProxyMessage {
+			sender_id: self.id.clone(),
+			dest: self.node_url().to_owned(),
+			method: "get_tx_kernels_from_node".to_owned(),
+			body: query_str,
+		};
+		{
+			let p = self.proxy_tx.lock();
+			p.send(m).context(libwallet::ErrorKind::ClientCallback(
+				"Get tx kernels from node send".to_owned(),
+			))?;
+		}
+		let r = self.rx.lock();
+		let m = r.recv().unwrap();
+		let results: Vec<TxKernelApiEntry> = serde_json::from_str(&m.body).unwrap();
+
+		for res in results {
+			api_tx_kernels.insert(res.kernel.excess, res);
+		}
+		Ok(api_tx_kernels)
 	}
 
 	fn get_outputs_by_pmmr_index(
