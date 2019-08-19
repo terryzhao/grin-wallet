@@ -617,15 +617,20 @@ pub fn proof(verified: TxProofVerified, _dark_background_color_scheme: bool) -> 
 	println!("Kernel Excess:");
 	println!("\t{}", excess.bright_magenta());
 
-	//todo: node api provide kernel query!
-	//	println!("\n{}: This proof should only be considered valid if the kernel is actually on-chain with sufficient confirmations!",
-	//			 "WARNING".bright_yellow());
-	//	println!("Please use a grin block explorer to verify this is the case. for example:");
-	//	let prefix = match is_mainnet() {
-	//		true => "",
-	//		false => "floonet.",
-	//	};
-	//	cli_message!("   https://{}grinscan.net/kernel/{}", prefix, excess);
+	match verified.confirmed {
+		true => {
+			match verified.height {
+				Some(height) => println!(
+					"\nTransaction {} on block height: {}",
+					"confirmed".bright_green(),
+					height
+				),
+				// impossible here
+				None => println!("\nTransaction {}", "confirmed".bright_green()),
+			}
+		}
+		false => println!("\nTransaction {}", "unconfirmed".bright_red()),
+	}
 
 	Ok(())
 }

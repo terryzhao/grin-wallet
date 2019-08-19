@@ -300,6 +300,12 @@ pub trait NodeClient: Sync + Send + Clone {
 		wallet_kernels_keys: Vec<String>,
 	) -> Result<HashMap<pedersen::Commitment, TxKernelApiEntry>, Error>;
 
+	/// retrieve a single tx kernel from the specified grin node
+	fn get_tx_kernel_from_node(
+		&self,
+		excess: String,
+	) -> Result<HashMap<pedersen::Commitment, TxKernelApiEntry>, Error>;
+
 	/// Get a list of outputs from the node by traversing the UTXO
 	/// set in PMMR index order.
 	/// Returns
@@ -1032,6 +1038,10 @@ pub struct TxProofVerified {
 	pub outputs: Vec<Commitment>,
 	/// Transaction kernel excess
 	pub excess: Commitment,
+	/// Whether this transaction have been confirmed
+	pub confirmed: bool,
+	/// Block height in which this transaction included
+	pub height: Option<u64>,
 }
 
 /// Serializes a TxProof message into a readable string (without those \\\ escapes)

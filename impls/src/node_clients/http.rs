@@ -221,6 +221,32 @@ impl NodeClient for HTTPNodeClient {
 		Ok(api_tx_kernels)
 	}
 
+	/// retrieve a single tx kernel from the specified grin node
+	fn get_tx_kernel_from_node(
+		&self,
+		excess: String,
+	) -> Result<HashMap<pedersen::Commitment, TxKernelApiEntry>, libwallet::Error> {
+		let addr = self.node_url();
+		let query_params = format!("id={}", excess);
+		let url = format!("{}/v1/chain/kernels/byids?{}", addr, query_params);
+
+		let mut api_tx_kernels: HashMap<pedersen::Commitment, TxKernelApiEntry> = HashMap::new();
+		let result =
+			match api::client::get::<Vec<TxKernelApiEntry>>(url.as_str(), self.node_api_secret()) {
+				Ok(tx_kernels) => tx_kernels,
+				Err(e) => {
+					let report = format!("Getting tx kernels by id: {}", e);
+					error!("Tx kernels by id failed: {}", e);
+					return Err(libwallet::ErrorKind::ClientCallback(report).into());
+				}
+			};
+
+		for res in result {
+			api_tx_kernels.insert(res.kernel.excess, res);
+		}
+		Ok(api_tx_kernels)
+	}
+
 	fn get_outputs_by_pmmr_index(
 		&self,
 		start_height: u64,

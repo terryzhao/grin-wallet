@@ -1063,6 +1063,7 @@ pub fn wallet_command(
 			inst_wallet(),
 			&global_wallet_args,
 			proof_command(args)?,
+			&wallet_config,
 			wallet_config.dark_background_color_scheme.unwrap_or(true),
 		),
 		("address", Some(_)) => command::address(

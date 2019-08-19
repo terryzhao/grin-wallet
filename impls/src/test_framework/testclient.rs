@@ -548,6 +548,14 @@ impl NodeClient for LocalWalletClient {
 		Ok(api_tx_kernels)
 	}
 
+	/// retrieve a single tx kernel from the specified grin node
+	fn get_tx_kernel_from_node(
+		&self,
+		_excess: String,
+	) -> Result<HashMap<pedersen::Commitment, TxKernelApiEntry>, libwallet::Error> {
+		unimplemented!()
+	}
+
 	fn get_outputs_by_pmmr_index(
 		&self,
 		start_height: u64,

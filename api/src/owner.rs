@@ -24,7 +24,7 @@ use uuid::Uuid;
 use crate::core::core::Transaction;
 use crate::grinrelay::hasher::derive_address_key;
 use crate::grinrelay::{sign_challenge, GrinboxAddress, TxProofImpl};
-use crate::impls::{HTTPWalletCommAdapter, KeybaseWalletCommAdapter, WalletSeed};
+use crate::impls::{HTTPNodeClient, HTTPWalletCommAdapter, KeybaseWalletCommAdapter, WalletSeed};
 use crate::keychain::{Identifier, Keychain};
 use crate::libwallet::api_impl::owner;
 use crate::libwallet::{
@@ -35,6 +35,7 @@ use crate::libwallet::{
 use crate::util::secp::key::PublicKey;
 use crate::util::secp::pedersen::Commitment;
 use crate::util::static_secp_instance;
+use crate::util::to_hex;
 
 /// Main interface into all wallet API functions.
 /// Wallet APIs are split into two seperate blocks of functionality
@@ -985,13 +986,16 @@ where
 		tx_slate_id: Option<Uuid>,
 	) -> Result<Option<TxProof>, Error> {
 		let mut w = self.wallet.lock();
-		//Note: no need to open if 'refresh_from_node' is false in 'retrieve_txs'
-		//w.open_with_credentials()?;
 		owner::get_stored_tx_proof(&mut *w, tx_id, tx_slate_id)
 	}
 
 	/// Verifies a transaction proof and returns relevant information
-	pub fn verify_tx_proof(&self, tx_proof: &TxProof) -> Result<TxProofVerified, Error> {
+	pub fn verify_tx_proof(
+		&self,
+		tx_proof: &TxProof,
+		check_node_api_http_addr: &str,
+		node_api_secret: Option<String>,
+	) -> Result<TxProofVerified, Error> {
 		// Check signature on the message
 		let slate = tx_proof.verify_extract(String::new())?;
 
@@ -1024,51 +1028,67 @@ where
 		// Receiver's excess
 		let excess = &slate.participant_data[1].public_blind_excess;
 
-		let secp = static_secp_instance();
-		let secp = secp.lock();
+		let excess_sum_com = {
+			let secp = static_secp_instance();
+			let secp = secp.lock();
 
-		// Calculate receiver's excess from their inputs and inputs
-		let commit_amount = secp.commit_value(tx_proof.amount)?;
-		inputs.push(commit_amount);
+			// Calculate receiver's excess from their inputs and inputs
+			let commit_amount = secp.commit_value(tx_proof.amount)?;
+			inputs.push(commit_amount);
 
-		let commit_excess = secp.commit_sum(outputs.clone(), inputs)?;
-		let pubkey_excess = commit_excess.to_pubkey(&secp)?;
+			let commit_excess = secp.commit_sum(outputs.clone(), inputs)?;
+			let pubkey_excess = commit_excess.to_pubkey(&secp)?;
 
-		// Verify receiver's excess with their inputs and outputs
-		if excess != &pubkey_excess {
-			return Err(ErrorKind::VerifyProof(
-				"Verify receiver's excess with their inputs and outputs".to_string(),
-			)
-			.into());
-		}
+			// Verify receiver's excess with their inputs and outputs
+			if excess != &pubkey_excess {
+				return Err(ErrorKind::VerifyProof(
+					"Verify receiver's excess with their inputs and outputs".to_string(),
+				)
+				.into());
+			}
 
-		// Calculate kernel excess from inputs and outputs
-		let excess_parts: Vec<&PublicKey> = slate
-			.participant_data
-			.iter()
-			.map(|p| &p.public_blind_excess)
-			.collect();
-		let excess_sum = PublicKey::from_combination(&secp, excess_parts)?;
+			// Calculate kernel excess from inputs and outputs
+			let excess_parts: Vec<&PublicKey> = slate
+				.participant_data
+				.iter()
+				.map(|p| &p.public_blind_excess)
+				.collect();
+			let excess_sum = PublicKey::from_combination(&secp, excess_parts)?;
 
-		let mut input_com: Vec<Commitment> =
-			slate.tx.inputs().iter().map(|i| i.commitment()).collect();
+			let mut input_com: Vec<Commitment> =
+				slate.tx.inputs().iter().map(|i| i.commitment()).collect();
 
-		let mut output_com: Vec<Commitment> =
-			slate.tx.outputs().iter().map(|o| o.commitment()).collect();
+			let mut output_com: Vec<Commitment> =
+				slate.tx.outputs().iter().map(|o| o.commitment()).collect();
 
-		input_com.push(secp.commit(0, slate.tx.offset.secret_key(&secp)?)?);
+			input_com.push(secp.commit(0, slate.tx.offset.secret_key(&secp)?)?);
 
-		output_com.push(secp.commit_value(slate.fee)?);
+			output_com.push(secp.commit_value(slate.fee)?);
 
-		let excess_sum_com = secp.commit_sum(output_com, input_com)?;
+			let excess_sum_com = secp.commit_sum(output_com, input_com)?;
 
-		// Verify kernel excess with all inputs and outputs
-		if excess_sum_com.to_pubkey(&secp)? != excess_sum {
-			return Err(ErrorKind::VerifyProof(
-				"Verify kernel excess with all inputs and outputs".to_string(),
-			)
-			.into());
-		}
+			// Verify kernel excess with all inputs and outputs
+			if excess_sum_com.to_pubkey(&secp)? != excess_sum {
+				return Err(ErrorKind::VerifyProof(
+					"Verify kernel excess with all inputs and outputs".to_string(),
+				)
+				.into());
+			}
+
+			excess_sum_com
+		};
+
+		// Check whether this transaction has been confirmed on the chain
+		let excess = to_hex(excess_sum_com.as_ref().to_vec());
+		let node_client = HTTPNodeClient::new(check_node_api_http_addr, node_api_secret);
+		let api_tx_kernels = node_client.get_tx_kernel_from_node(excess)?;
+
+		let (confirmed, height) = if api_tx_kernels.len() > 0 {
+			let tx_kernel = api_tx_kernels.get(&excess_sum_com).unwrap();
+			(true, Some(tx_kernel.height))
+		} else {
+			(false, None)
+		};
 
 		return Ok(TxProofVerified {
 			sender: tx_proof.sender_address.clone(),
@@ -1076,6 +1096,8 @@ where
 			amount: tx_proof.amount,
 			outputs,
 			excess: excess_sum_com,
+			confirmed,
+			height,
 		});
 	}
 

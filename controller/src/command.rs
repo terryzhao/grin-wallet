@@ -953,6 +953,7 @@ pub fn proof(
 	wallet: Arc<Mutex<WalletInst<impl NodeClient + 'static, keychain::ExtKeychain>>>,
 	_g_args: &GlobalArgs,
 	args: ProofArgs,
+	config: &WalletConfig,
 	dark_scheme: bool,
 ) -> Result<(), Error> {
 	let home_dir = dirs::home_dir()
@@ -964,8 +965,11 @@ pub fn proof(
 			ProofArgs::Export(index, filename, msg) => {
 				let tx_proof = api.get_stored_tx_proof(Some(index), None)?;
 				if let Some(mut tx_proof) = tx_proof {
-					let verified = api.verify_tx_proof(&tx_proof)?;
-
+					let verified = api.verify_tx_proof(
+						&tx_proof,
+						&config.check_node_api_http_addr,
+						config.node_api_secret.clone(),
+					)?;
 					if !msg.is_empty() {
 						tx_proof.prover_msg = Some(msg.to_string());
 						let tx_entries = api.retrieve_txs(false, Some(index), None)?.1;
@@ -991,7 +995,11 @@ pub fn proof(
 				let mut tx_proof = String::new();
 				file.read_to_string(&mut tx_proof)?;
 				let tx_proof: TxProof = serde_json::from_str(&tx_proof)?;
-				let verified = api.verify_tx_proof(&tx_proof)?;
+				let verified = api.verify_tx_proof(
+					&tx_proof,
+					&config.check_node_api_http_addr,
+					config.node_api_secret.clone(),
+				)?;
 				let _ = display::proof(verified, dark_scheme);
 			}
 		};
