@@ -345,7 +345,9 @@ where
 									&& t.parent_key_id == *parent_key_id
 							});
 							if let Some(mut t) = tx {
+								// todo: use block time instead of local time.
 								t.update_confirmation_ts();
+								t.height = Some(o.1);
 								t.confirmed = true;
 								batch.save_tx_log_entry(t, &parent_key_id)?;
 							}
@@ -451,8 +453,9 @@ where
 							}
 
 							// also mark the transaction as confirmed
-							// todo: use packaged block time instead of local time.
+							// todo: use block time instead of local time.
 							tx_entry.update_confirmation_ts();
+							tx_entry.height = Some(tx_kernel_api_entry.height);
 							tx_entry.confirmed = true;
 							batch.save_tx_log_entry(tx_entry, &parent_key_id)?;
 						}

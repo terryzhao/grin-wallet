@@ -815,6 +815,8 @@ pub struct TxLogEntry {
 	/// confirmed (In all cases either all outputs involved in a tx should be
 	/// confirmed, or none should be; otherwise there's a deeper problem)
 	pub confirmed: bool,
+	/// Height of confirmation block
+	pub height: Option<u64>,
 	/// number of inputs involved in TX
 	pub num_inputs: usize,
 	/// number of outputs involved in TX
@@ -857,16 +859,17 @@ impl TxLogEntry {
 	pub fn new(parent_key_id: Identifier, t: TxLogEntryType, id: u32) -> Self {
 		TxLogEntry {
 			parent_key_id: parent_key_id,
-			tx_type: t,
 			id: id,
 			tx_slate_id: None,
+			tx_type: t,
 			creation_ts: Utc::now(),
 			confirmation_ts: None,
 			confirmed: false,
-			amount_credited: 0,
-			amount_debited: 0,
+			height: None,
 			num_inputs: 0,
 			num_outputs: 0,
+			amount_credited: 0,
+			amount_debited: 0,
 			fee: None,
 			messages: None,
 			stored_tx: None,
@@ -886,6 +889,24 @@ impl TxLogEntry {
 	/// Update confirmation TS with now
 	pub fn update_confirmation_ts(&mut self) {
 		self.confirmation_ts = Some(Utc::now());
+	}
+
+	/// How many confirmations has this transaction on block chain?
+	/// If height == None then we are Unconfirmed
+	pub fn num_confirmations(&self, current_height: u64) -> u64 {
+		match self.height {
+			Some(height) => match current_height {
+				c if height > c => 0,
+				_ => match self.confirmed {
+					// impossible here
+					false => 0,
+					// if a transaction has height n and we are at block n
+					// then we have a single confirmation (the block it originated in)
+					true => 1 + (current_height - height),
+				},
+			},
+			None => 0,
+		}
 	}
 }
 

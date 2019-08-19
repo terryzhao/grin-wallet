@@ -250,7 +250,8 @@ pub fn txs(
 		bMG->"Shared Transaction Id",
 		bMG->"Creation Time",
 		bMG->"Confirmed?",
-		bMG->"Confirmation Time",
+		// bMG->"Confirmation Time",
+		bMG->"# Confirms",
 		bMG->"Num. \nInputs",
 		bMG->"Num. \nOutputs",
 		bMG->"Amount \nCredited",
@@ -268,11 +269,12 @@ pub fn txs(
 		};
 		let entry_type = format!("{}", t.tx_type);
 		let creation_ts = format!("{}", t.creation_ts.format("%Y-%m-%d %H:%M:%S"));
-		let confirmation_ts = match t.confirmation_ts {
+		let _confirmation_ts = match t.confirmation_ts {
 			Some(m) => format!("{}", m.format("%Y-%m-%d %H:%M:%S")),
 			None => "None".to_owned(),
 		};
 		let confirmed = format!("{}", t.confirmed);
+		let num_confirmations = format!("{}", t.num_confirmations(cur_height));
 		let num_inputs = format!("{}", t.num_inputs);
 		let num_outputs = format!("{}", t.num_outputs);
 		let amount_debited_str = core::amount_to_hr_string(t.amount_debited, true);
@@ -300,7 +302,8 @@ pub fn txs(
 				bFC->slate_id,
 				bFB->creation_ts,
 				bFC->confirmed,
-				bFB->confirmation_ts,
+				// bFB->confirmation_ts,
+				bFB->num_confirmations,
 				bFC->num_inputs,
 				bFC->num_outputs,
 				bFG->amount_credited_str,
@@ -317,7 +320,8 @@ pub fn txs(
 					bFD->slate_id,
 					bFB->creation_ts,
 					bFg->confirmed,
-					bFB->confirmation_ts,
+					// bFB->confirmation_ts,
+					bFB->num_confirmations,
 					bFD->num_inputs,
 					bFD->num_outputs,
 					bFG->amount_credited_str,
@@ -333,7 +337,8 @@ pub fn txs(
 					bFD->slate_id,
 					bFB->creation_ts,
 					bFR->confirmed,
-					bFB->confirmation_ts,
+					// bFB->confirmation_ts,
+					bFB->num_confirmations,
 					bFD->num_inputs,
 					bFD->num_outputs,
 					bFG->amount_credited_str,
