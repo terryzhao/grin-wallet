@@ -177,7 +177,7 @@ pub fn payments(
 		let value = if out.value == 0 {
 			"unknown".to_owned()
 		} else {
-			format!("{}", core::amount_to_hr_string(out.value, false))
+			format!("{}", core::amount_to_hr_string(out.value, true))
 		};
 		let slate_id = format!("{}", out.slate_id);
 
