@@ -197,6 +197,9 @@ where
 	/// Add or update data about a payment output to the backend
 	fn save_payment(&mut self, out: PaymentData) -> Result<(), Error>;
 
+	/// Delete a payment output to the backend
+	fn delete_payment(&mut self, out: &PaymentData) -> Result<(), Error>;
+
 	/// Add or update data about a payment commits list to the backend
 	fn save_payment_commits(&mut self, u: &Uuid, commits: PaymentCommits) -> Result<(), Error>;
 
@@ -845,6 +848,8 @@ pub struct TxLogEntry {
 	pub grinrelay_key_path: Option<u64>,
 	/// Transaction Kernel Public Excess
 	pub kernel_excess: Option<String>,
+	/// Whether this transaction has been posted to the node
+	pub posted: Option<bool>,
 }
 
 impl ser::Writeable for TxLogEntry {
@@ -881,6 +886,7 @@ impl TxLogEntry {
 			stored_tx: None,
 			grinrelay_key_path: None,
 			kernel_excess: None,
+			posted: Some(false),
 		}
 	}
 

@@ -287,6 +287,25 @@ where
 	Ok(())
 }
 
+/// Cancel transaction payments
+pub fn cancel_payments<T: ?Sized, C, K>(wallet: &mut T, tx_slate_id: Uuid) -> Result<(), Error>
+where
+	T: WalletBackend<C, K>,
+	C: NodeClient,
+	K: Keychain,
+{
+	let payments = wallet
+		.payment_log_iter()
+		.filter(|p| p.slate_id == tx_slate_id)
+		.collect::<Vec<_>>();
+	let mut batch = wallet.batch()?;
+	for payment in &payments {
+		batch.delete_payment(payment)?;
+	}
+	batch.commit()?;
+	Ok(())
+}
+
 /// Apply refreshed API output data to the wallet
 pub fn apply_api_outputs<T: ?Sized, C, K>(
 	wallet: &mut T,
@@ -344,24 +363,34 @@ where
 								Some(t.id) == output.tx_log_entry
 									&& t.parent_key_id == *parent_key_id
 							});
+
+							let mut is_canceled_tx = false;
 							if let Some(mut t) = tx {
-								// todo: use block time instead of local time.
-								t.update_confirmation_ts();
-								t.height = Some(o.1);
-								t.confirmed = true;
-								batch.save_tx_log_entry(t, &parent_key_id)?;
+								if t.tx_type == TxLogEntryType::TxSentCancelled {
+									// For a send cancelled tx, the 'output' presented in 'api_outputs' is actually the unlocked 'input'.
+									// in this case, we shouldn't mark the cancelled transaction as 'confirmed'.
+									is_canceled_tx = true;
+								} else {
+									// todo: use block time instead of local time.
+									t.update_confirmation_ts();
+									t.height = Some(o.1);
+									t.confirmed = true;
+									batch.save_tx_log_entry(t, &parent_key_id)?;
+								}
 							}
 
-							// if there's a related payment output being confirmed, refresh that payment log
-							if let Some(slate_id) = output.slate_id {
-								if let Ok(commits) = batch.get_payment_commits(&slate_id) {
-									for commit in commits.commits {
-										if let Ok(mut payment) =
-											batch.get_payment_log_entry(commit.clone())
-										{
-											payment.height = o.1;
-											payment.mark_confirmed();
-											batch.save_payment(payment)?;
+							if !is_canceled_tx {
+								// if there's a related payment output being confirmed, refresh that payment log
+								if let Some(slate_id) = output.slate_id {
+									if let Ok(commits) = batch.get_payment_commits(&slate_id) {
+										for commit in commits.commits {
+											if let Ok(mut payment) =
+												batch.get_payment_log_entry(commit.clone())
+											{
+												payment.height = o.1;
+												payment.mark_confirmed();
+												batch.save_payment(payment)?;
+											}
 										}
 									}
 								}
@@ -496,17 +525,17 @@ where
 	//		- Normally also works for transactions happened in 2 weeks (non-archive mode node).
 	//		- Depending on the node status of tx kernel mmr position index, which is configurable.
 	{
-		let tx_entries = retrieve_txs(
-			wallet,
-			None,
-			None,
-			Some(&parent_key_id),
-			true,
-			Some(TxLogEntryType::TxSent),
-		)?;
+		let tx_entries: Vec<TxLogEntry> =
+			retrieve_txs(wallet, None, None, Some(&parent_key_id), true, None)?
+				.into_iter()
+				.filter(|t| {
+					(t.tx_type == TxLogEntryType::TxSent
+						|| t.tx_type == TxLogEntryType::TxSentCancelled)
+						&& t.kernel_excess.is_some()
+				})
+				.collect();
 		let wallet_kernels_keys = tx_entries
 			.iter()
-			.filter(|tx_entry| tx_entry.kernel_excess.is_some())
 			.map(|tx| tx.kernel_excess.clone().unwrap())
 			.collect();
 

@@ -582,7 +582,7 @@ where
 				};
 
 				if sa.post_tx {
-					self.post_tx(&slate.tx, sa.fluff)?;
+					self.post_tx(Some(slate.id), &slate.tx, sa.fluff)?;
 				}
 				Ok(slate)
 			}
@@ -829,6 +829,9 @@ where
 	/// for mining.
 	///
 	/// # Arguments
+	/// * `tx_slate_id` - If `Some(uuid)`, only return transactions associated with
+	/// the given [`Slate`](../grin_wallet_libwallet/slate/struct.Slate.html) uuid.
+	///
 	/// * `tx` - A completed [`Transaction`](../grin_core/core/transaction/struct.Transaction.html),
 	/// typically the `tx` field in the transaction [`Slate`](../grin_wallet_libwallet/slate/struct.Slate.html).
 	///
@@ -870,16 +873,37 @@ where
 	///		// Retrieve slate back from recipient
 	///		//
 	///		let res = api_owner.finalize_tx(&slate, None, None);
-	///		let res = api_owner.post_tx(&slate.tx, true);
+	///		let res = api_owner.post_tx(Some(slate.id), &slate.tx, true);
 	/// }
 	/// ```
-
-	pub fn post_tx(&self, tx: &Transaction, fluff: bool) -> Result<(), Error> {
+	pub fn post_tx(
+		&self,
+		tx_slate_id: Option<Uuid>,
+		tx: &Transaction,
+		fluff: bool,
+	) -> Result<(), Error> {
 		let client = {
+			// todo: try to avoid locking wallet twice in this function.
+			// Note: 'owner::post_tx()' can't allow wallet locked, because 'testclient' need to lock
+			// wallet for 'award_block_to_wallet'.
 			let mut w = self.wallet.lock();
 			w.w2n_client().clone()
 		};
-		owner::post_tx(&client, tx, fluff)
+		let post_res = owner::post_tx(&client, tx, fluff);
+
+		if post_res.is_ok() {
+			if tx_slate_id.is_some() {
+				let mut w = self.wallet.lock();
+				w.open_with_credentials()?;
+				let set_res = owner::set_tx_posted(&mut *w, None, tx_slate_id);
+				if set_res.is_err() {
+					error!("failed to set tx {:?} as posted", tx_slate_id);
+					// todo: handle the failure of set_tx_posted
+				}
+				w.close()?;
+			}
+		}
+		post_res
 	}
 
 	/// Re-Posts the last unconfirmed transaction/s to the listening node for validation and inclusion in a block

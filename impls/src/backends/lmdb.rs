@@ -528,6 +528,13 @@ where
 		Ok(())
 	}
 
+	fn delete_payment(&mut self, out: &PaymentData) -> Result<(), Error> {
+		let commit = out.commit.clone();
+		let key = to_key(PAYMENT_PREFIX, &mut commit.as_bytes().to_vec());
+		let _ = self.db.borrow().as_ref().unwrap().delete(&key);
+		Ok(())
+	}
+
 	fn get(&self, id: &Identifier, mmr_index: &Option<u64>) -> Result<OutputData, Error> {
 		let key = match mmr_index {
 			Some(i) => to_key_u64(OUTPUT_PREFIX, &mut id.to_bytes().to_vec(), *i),

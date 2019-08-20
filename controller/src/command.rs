@@ -496,7 +496,7 @@ pub fn send(
 				api.tx_lock_outputs(&slate, 0)?;
 			}
 			if adapter.supports_sync() {
-				let result = api.post_tx(&slate.tx, args.fluff);
+				let result = api.post_tx(Some(slate.id), &slate.tx, args.fluff);
 				match result {
 					Ok(_) => {
 						info!("Tx sent ok",);
@@ -506,7 +506,7 @@ pub fn send(
 						// re-post last unconfirmed txs and try again
 						if let Ok(true) = api.repost_last_txs(args.fluff, false) {
 							// iff one re-post success, post this transaction again
-							if let Ok(_) = api.post_tx(&slate.tx, args.fluff) {
+							if let Ok(_) = api.post_tx(Some(slate.id), &slate.tx, args.fluff) {
 								info!("Tx sent ok (with last unconfirmed tx/s re-post)");
 								return Ok(());
 							}
@@ -605,7 +605,7 @@ pub fn finalize(
 	}
 
 	controller::owner_single_use(wallet.clone(), |api| {
-		let result = api.post_tx(&slate.tx, args.fluff);
+		let result = api.post_tx(Some(slate.id), &slate.tx, args.fluff);
 		match result {
 			Ok(_) => {
 				info!("Transaction sent successfully, check the wallet again for confirmation.");
@@ -1061,7 +1061,7 @@ pub fn repost(
 					);
 					return Ok(());
 				}
-				api.post_tx(&stored_tx.unwrap(), args.fluff)?;
+				api.post_tx(txs[0].tx_slate_id, &stored_tx.unwrap(), args.fluff)?;
 				info!("Reposted transaction at {}", args.id);
 				return Ok(());
 			}

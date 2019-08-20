@@ -476,6 +476,36 @@ where
 }
 
 /// Re-Post the last unconfirmed transaction/s to the chain.
+pub fn set_tx_posted<T: ?Sized, C, K>(
+	w: &mut T,
+	tx_id: Option<u32>,
+	tx_slate_id: Option<Uuid>,
+) -> Result<(), Error>
+where
+	T: WalletBackend<C, K>,
+	C: NodeClient,
+	K: Keychain,
+{
+	let parent_key_id = w.parent_key_id();
+	let txs = updater::retrieve_txs(
+		&mut *w,
+		tx_id,
+		tx_slate_id,
+		Some(&parent_key_id),
+		false,
+		Some(TxLogEntryType::TxSent),
+	)?;
+
+	let mut batch = w.batch()?;
+	for mut tx in txs {
+		tx.posted = Some(true);
+		batch.save_tx_log_entry(tx, &parent_key_id)?;
+	}
+	batch.commit()?;
+	Ok(())
+}
+
+/// Re-Post the last unconfirmed transaction/s to the chain.
 pub fn repost_last_txs<T: ?Sized, C, K>(
 	w: &mut T,
 	fluff: bool,

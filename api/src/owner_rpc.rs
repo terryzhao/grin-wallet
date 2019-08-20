@@ -239,6 +239,7 @@ pub trait OwnerRpc {
 			  "num_inputs": 0,
 			  "num_outputs": 1,
 			  "parent_key_id": "0200000000000000000000000000000000",
+			  "posted": false,
 			  "stored_tx": null,
 			  "tx_slate_id": null,
 			  "tx_type": "ConfirmedCoinbase"
@@ -258,6 +259,7 @@ pub trait OwnerRpc {
 			  "num_inputs": 0,
 			  "num_outputs": 1,
 			  "parent_key_id": "0200000000000000000000000000000000",
+			  "posted": false,
 			  "stored_tx": null,
 			  "tx_slate_id": null,
 			  "tx_type": "ConfirmedCoinbase"
@@ -894,6 +896,7 @@ pub trait OwnerRpc {
 		"id": 1,
 		"method": "post_tx",
 		"params": [
+		null,
 		{
 			"offset": "d202964900000000d302964900000000d402964900000000d502964900000000",
 			"body": {
@@ -948,7 +951,12 @@ pub trait OwnerRpc {
 	```
 	 */
 
-	fn post_tx(&self, tx: &Transaction, fluff: bool) -> Result<(), ErrorKind>;
+	fn post_tx(
+		&self,
+		tx_slate_id: Option<Uuid>,
+		tx: &Transaction,
+		fluff: bool,
+	) -> Result<(), ErrorKind>;
 
 	/**
 	Networked version of [Owner::cancel_tx](struct.Owner.html#method.cancel_tx).
@@ -1317,8 +1325,13 @@ where
 		Owner::get_stored_tx(self, tx).map_err(|e| e.kind())
 	}
 
-	fn post_tx(&self, tx: &Transaction, fluff: bool) -> Result<(), ErrorKind> {
-		Owner::post_tx(self, tx, fluff).map_err(|e| e.kind())
+	fn post_tx(
+		&self,
+		tx_slate_id: Option<Uuid>,
+		tx: &Transaction,
+		fluff: bool,
+	) -> Result<(), ErrorKind> {
+		Owner::post_tx(self, tx_slate_id, tx, fluff).map_err(|e| e.kind())
 	}
 
 	fn verify_slate_messages(&self, slate: &Slate) -> Result<(), ErrorKind> {

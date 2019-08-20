@@ -352,13 +352,22 @@ where
 	if tx.tx_type != TxLogEntryType::TxSent && tx.tx_type != TxLogEntryType::TxReceived {
 		return Err(ErrorKind::TransactionNotCancellable(tx_id_string))?;
 	}
-	if tx.confirmed == true {
+	if tx.confirmed == true || tx.posted == Some(true) {
+		info!(
+			"The transaction can't be cancelled, because it has been {}",
+			if tx.confirmed { "confirmed" } else { "posted" }
+		);
 		return Err(ErrorKind::TransactionNotCancellable(tx_id_string))?;
 	}
 	// get outputs associated with tx
 	let res = updater::retrieve_outputs(wallet, true, Some(tx.id), None, Some(&parent_key_id))?;
 	let outputs = res.iter().map(|m| m.output.clone()).collect();
-	updater::cancel_tx_and_outputs(wallet, tx, outputs, parent_key_id)?;
+	updater::cancel_tx_and_outputs(wallet, tx.clone(), outputs, parent_key_id)?;
+	if tx.tx_type == TxLogEntryType::TxSent {
+		if let Some(tx_slate_id) = tx.tx_slate_id {
+			updater::cancel_payments(wallet, tx_slate_id)?;
+		}
+	}
 	Ok(())
 }
 

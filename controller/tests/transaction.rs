@@ -173,7 +173,7 @@ fn basic_transaction_api(test_dir: &str) -> Result<(), libwallet::Error> {
 
 	// post transaction
 	wallet::controller::owner_single_use(wallet1.clone(), |api| {
-		api.post_tx(&slate.tx, false)?;
+		api.post_tx(Some(slate.id), &slate.tx, false)?;
 		Ok(())
 	})?;
 
@@ -312,7 +312,7 @@ fn basic_transaction_api(test_dir: &str) -> Result<(), libwallet::Error> {
 			.find(|t| t.tx_slate_id == Some(slate.id))
 			.unwrap();
 		let stored_tx = sender_api.get_stored_tx(&tx)?;
-		sender_api.post_tx(&stored_tx.unwrap(), false)?;
+		sender_api.post_tx(tx.tx_slate_id, &stored_tx.unwrap(), false)?;
 		let (_, wallet1_info) = sender_api.retrieve_summary_info(true, 1)?;
 		// should be mined now
 		assert_eq!(
