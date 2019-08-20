@@ -503,7 +503,16 @@ pub fn send(
 						return Ok(());
 					}
 					Err(e) => {
-						error!("Tx sent fail on post: {}.", e);
+						// re-post last unconfirmed txs and try again
+						if let Ok(true) = api.repost_last_txs(args.fluff, false) {
+							// iff one re-post success, post this transaction again
+							if let Ok(_) = api.post_tx(&slate.tx, args.fluff) {
+								info!("Tx sent ok (with last unconfirmed tx/s re-post)");
+								return Ok(());
+							}
+						}
+
+						error!("Tx sent fail on post.");
 						let _ = api.cancel_tx(None, Some(slate.id));
 						return Err(e);
 					}

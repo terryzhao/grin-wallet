@@ -463,7 +463,7 @@ where
 	let tx_hex = grin_util::to_hex(ser::ser_vec(tx).unwrap());
 	let res = client.post_tx(&TxWrapper { tx_hex: tx_hex }, fluff);
 	if let Err(e) = res {
-		error!("api: post_tx: failed with error: {}", e);
+		debug!("api: post_tx: failed with error: {}", e);
 		Err(e)
 	} else {
 		debug!(
@@ -473,6 +473,72 @@ where
 		);
 		Ok(())
 	}
+}
+
+/// Re-Post the last unconfirmed transaction/s to the chain.
+pub fn repost_last_txs<T: ?Sized, C, K>(
+	w: &mut T,
+	fluff: bool,
+	include_last: bool,
+) -> Result<bool, Error>
+where
+	T: WalletBackend<C, K>,
+	C: NodeClient,
+	K: Keychain,
+{
+	let parent_key_id = w.parent_key_id();
+	let mut txs = updater::retrieve_txs(
+		&mut *w,
+		None,
+		None,
+		Some(&parent_key_id),
+		false,
+		Some(TxLogEntryType::TxSent),
+	)?;
+	if txs.len() == 0 || (!include_last && txs.len() == 1) {
+		return Ok(false);
+	}
+	let mut last_tx_entry = txs.pop().unwrap();
+	if !include_last {
+		last_tx_entry = txs.pop().unwrap();
+	}
+	if last_tx_entry.confirmed {
+		return Ok(false);
+	}
+
+	// Collect all continuous unconfirmed txs
+	let mut last_unconfirmed_txs: Vec<TxLogEntry> = vec![];
+	last_unconfirmed_txs.push(last_tx_entry);
+	for tx_entry in txs.into_iter().rev() {
+		if !tx_entry.confirmed {
+			last_unconfirmed_txs.push(tx_entry);
+		} else {
+			// Stop if a tx was confirmed
+			break;
+		}
+	}
+
+	// re-post them one by one (in the order of the time)
+	let mut is_success = false;
+	for tx_entry in last_unconfirmed_txs.iter().rev() {
+		if let Ok(tx) = w.get_stored_tx(tx_entry) {
+			if let Some(tx) = tx {
+				let tx_hex = grin_util::to_hex(ser::ser_vec(&tx).unwrap());
+				if let Ok(_) = w.w2n_client().post_tx(&TxWrapper { tx_hex }, fluff) {
+					debug!(
+						"repost_last_txs: tx {} successfully posted. slate_id: {} fluff: {}",
+						tx_entry.id,
+						tx_entry.tx_slate_id.unwrap(),
+						fluff
+					);
+					is_success = true;
+				}
+			}
+		}
+	}
+
+	// If there's ONE success re-post, return Ok(true)
+	Ok(is_success)
 }
 
 /// verify slate messages

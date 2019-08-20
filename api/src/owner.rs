@@ -882,6 +882,62 @@ where
 		owner::post_tx(&client, tx, fluff)
 	}
 
+	/// Re-Posts the last unconfirmed transaction/s to the listening node for validation and inclusion in a block
+	/// for mining.
+	///
+	/// # Arguments
+	/// * `fluff` - Instruct the node whether to use the Dandelion protocol when posting the
+	/// transaction. If `true`, the node should skip the Dandelion phase and broadcast the
+	/// transaction to all peers immediately. If `false`, the node will follow dandelion logic and
+	/// initiate the stem phase.
+	///
+	/// * `include_last` - Whether including the last one transaction, which could be the current
+	/// operating transaction.
+	///
+	/// # Returns
+	/// * `Ok(())` if successful
+	/// * or [`libwallet::Error`](../grin_wallet_libwallet/struct.Error.html) if an error is encountered.
+	///
+	/// # Example
+	/// Set up as in [`new`](struct.Owner.html#method.new) method above.
+	/// ```
+	/// # grin_wallet_api::doctest_helper_setup_doc_env!(wallet, wallet_config);
+	///
+	/// let mut api_owner = Owner::new(wallet.clone());
+	/// let args = InitTxArgs {
+	/// 	src_acct_name: None,
+	/// 	amount: 2_000_000_000,
+	/// 	minimum_confirmations: 10,
+	/// 	max_outputs: 500,
+	/// 	num_change_outputs: 1,
+	/// 	selection_strategy: "all".to_owned(),
+	/// 	message: Some("Post this tx".to_owned()),
+	/// 	..Default::default()
+	/// };
+	/// let result = api_owner.init_send_tx(
+	/// 	args,
+	/// );
+	///
+	/// if let Ok(slate) = result {
+	///		// Send slate somehow
+	///		// ...
+	///		// Lock our outputs if we're happy the slate was (or is being) sent
+	///		let res = api_owner.tx_lock_outputs(&slate, 0);
+	///		//
+	///		// Retrieve slate back from recipient
+	///		//
+	///		let res = api_owner.finalize_tx(&slate, None, None);
+	///		let res = api_owner.repost_last_txs(true, true);
+	/// }
+	/// ```
+	pub fn repost_last_txs(&self, fluff: bool, include_last: bool) -> Result<bool, Error> {
+		let mut w = self.wallet.lock();
+		w.open_with_credentials()?;
+		let res = owner::repost_last_txs(&mut *w, fluff, include_last);
+		w.close()?;
+		res
+	}
+
 	/// Cancels a transaction. This entails:
 	/// * Setting the transaction status to either `TxSentCancelled` or `TxReceivedCancelled`
 	/// * Deleting all change outputs or recipient outputs associated with the transaction
