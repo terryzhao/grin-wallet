@@ -24,11 +24,12 @@ use uuid::Uuid;
 
 use crate::blake2::blake2b::Blake2b;
 
+use super::wallet_store::{self, option_to_not_found};
 use crate::keychain::{ChildNumber, ExtKeychain, Identifier, Keychain, SwitchCommitmentType};
-use crate::store::{self, option_to_not_found, to_key, to_key_u64};
+use crate::store::{to_key, to_key_u64};
 
 use crate::core::core::Transaction;
-use crate::core::{global, ser};
+use crate::core::{self, global};
 use crate::libwallet::{check_repair, check_repair_batch, restore, restore_batch};
 use crate::libwallet::{
 	AcctPathMapping, Context, Error, ErrorKind, Listener, NodeClient, OutputData, PaymentCommits,
@@ -95,7 +96,7 @@ where
 }
 
 pub struct LMDBBackend<C, K> {
-	db: store::Store,
+	db: wallet_store::Store,
 	config: WalletConfig,
 	/// passphrase: TODO better ways of dealing with this other than storing
 	passphrase: ZeroingString,
@@ -122,7 +123,7 @@ impl<C, K> LMDBBackend<C, K> {
 		fs::create_dir_all(&stored_tx_proof_path)
 			.expect("Couldn't create wallet backend tx proof storage directory!");
 
-		let store = store::Store::new(db_path.to_str().unwrap(), None, Some(DB_DIR), None)?;
+		let store = wallet_store::Store::new(db_path.to_str().unwrap(), None, Some(DB_DIR), None)?;
 
 		// Make sure default wallet derivation path always exists
 		// as well as path (so it can be retrieved by batches to know where to store
@@ -347,7 +348,7 @@ where
 			.join(filename);
 		let path_buf = Path::new(&path).to_path_buf();
 		let mut stored_tx = File::create(path_buf)?;
-		let tx_hex = util::to_hex(ser::ser_vec(tx).unwrap());;
+		let tx_hex = util::to_hex(core::ser::ser_vec(tx).unwrap());;
 		stored_tx.write_all(&tx_hex.as_bytes())?;
 		stored_tx.sync_all()?;
 		Ok(())
@@ -380,7 +381,7 @@ where
 		tx_f.read_to_string(&mut content)?;
 		let tx_bin = util::from_hex(content).unwrap();
 		Ok(Some(
-			ser::deserialize::<Transaction>(&mut &tx_bin[..]).unwrap(),
+			core::ser::deserialize::<Transaction>(&mut &tx_bin[..]).unwrap(),
 		))
 	}
 
@@ -479,7 +480,7 @@ where
 	K: Keychain,
 {
 	_store: &'a LMDBBackend<C, K>,
-	db: RefCell<Option<store::Batch<'a>>>,
+	db: RefCell<Option<wallet_store::Batch<'a>>>,
 	/// Keychain
 	keychain: Option<K>,
 }

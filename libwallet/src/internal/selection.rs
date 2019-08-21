@@ -15,12 +15,13 @@
 //! Selection of inputs for building transactions
 
 use crate::error::{Error, ErrorKind};
-use crate::grin_core::core::amount_to_hr_string;
+use crate::grin_core::core::{amount_to_hr_string, TransactionBody};
 use crate::grin_core::libtx::{
 	build,
 	proof::{ProofBuild, ProofBuilder},
 	tx_fee,
 };
+use crate::grin_core::{consensus, global};
 use crate::grin_keychain::{Identifier, Keychain};
 use crate::internal::keys;
 use crate::slate::Slate;
@@ -281,6 +282,24 @@ where
 		selection_strategy,
 		&parent_key_id,
 	)?;
+
+	{
+		// Quick block weight check before proceeding.
+		// Note: We use weight_as_block here (inputs have weight).
+		let tx_block_weight = TransactionBody::weight_as_block(coins.len(), change_outputs + 2, 2);
+
+		if tx_block_weight > global::max_block_weight() {
+			info!(
+				"transaction size overloaded. please limit the change outputs in [1..{}]",
+				(global::max_block_weight()
+					- coins.len().saturating_mul(consensus::BLOCK_INPUT_WEIGHT)
+					- 2usize.saturating_mul(consensus::BLOCK_KERNEL_WEIGHT))
+					/ consensus::BLOCK_OUTPUT_WEIGHT
+					- 3,
+			);
+			return Err(ErrorKind::GenericError("transaction size overloading".to_string()).into());
+		}
+	}
 
 	// build transaction skeleton with inputs and change
 	let (mut parts, change_amounts_derivations) =

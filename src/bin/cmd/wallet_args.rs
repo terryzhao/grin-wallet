@@ -582,7 +582,7 @@ pub fn parse_send_args(args: &ArgMatches) -> Result<command::SendArgs, ParseErro
 	let fluff = args.is_present("fluff");
 
 	// max_outputs
-	let max_outputs = 500;
+	let max_outputs = 10_000;
 
 	// target slate version to create/send
 	let target_slate_version = {

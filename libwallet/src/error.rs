@@ -91,7 +91,7 @@ pub enum ErrorKind {
 
 	/// Other serialization errors
 	#[fail(display = "Ser/Deserialization error")]
-	Deser(crate::grin_core::ser::Error),
+	Deser(crate::wallet_ser::Error),
 
 	/// IO Error
 	#[fail(display = "I/O error")]
@@ -304,8 +304,8 @@ impl From<transaction::Error> for Error {
 	}
 }
 
-impl From<crate::grin_core::ser::Error> for Error {
-	fn from(error: crate::grin_core::ser::Error) -> Error {
+impl From<crate::wallet_ser::Error> for Error {
+	fn from(error: crate::wallet_ser::Error) -> Error {
 		Error {
 			inner: Context::new(ErrorKind::Deser(error)),
 		}

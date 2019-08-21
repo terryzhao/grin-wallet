@@ -13,5 +13,6 @@
 // limitations under the License.
 
 mod lmdb;
+pub mod wallet_store;
 
 pub use self::lmdb::{wallet_db_exists, LMDBBackend};

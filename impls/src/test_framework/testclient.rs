@@ -23,7 +23,7 @@ use crate::config::WalletConfig;
 use crate::core::core::verifier_cache::LruVerifierCache;
 use crate::core::core::{Transaction, TxKernelApiEntry};
 use crate::core::global::{set_mining_mode, ChainTypes};
-use crate::core::{pow, ser};
+use crate::core::{self, pow};
 use crate::keychain::Keychain;
 use crate::libwallet::api_impl::foreign;
 use crate::libwallet::{NodeClient, NodeVersionInfo, Slate, TxProof, TxWrapper, WalletInst};
@@ -183,7 +183,7 @@ where
 			libwallet::ErrorKind::ClientCallback("Error parsing TxWrapper: tx_bin".to_owned()),
 		)?;
 
-		let tx: Transaction = ser::deserialize(&mut &tx_bin[..]).context(
+		let tx: Transaction = core::ser::deserialize(&mut &tx_bin[..]).context(
 			libwallet::ErrorKind::ClientCallback("Error parsing TxWrapper: tx".to_owned()),
 		)?;
 

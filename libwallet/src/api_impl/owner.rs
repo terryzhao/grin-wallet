@@ -17,8 +17,7 @@
 use uuid::Uuid;
 
 use crate::grin_core::core::hash::Hashed;
-use crate::grin_core::core::Transaction;
-use crate::grin_core::ser;
+use crate::grin_core::{self, core::Transaction};
 use crate::grin_util;
 
 use crate::grin_keychain::{Identifier, Keychain};
@@ -460,7 +459,7 @@ pub fn post_tx<C>(client: &C, tx: &Transaction, fluff: bool) -> Result<(), Error
 where
 	C: NodeClient,
 {
-	let tx_hex = grin_util::to_hex(ser::ser_vec(tx).unwrap());
+	let tx_hex = grin_util::to_hex(grin_core::ser::ser_vec(tx).unwrap());
 	let res = client.post_tx(&TxWrapper { tx_hex: tx_hex }, fluff);
 	if let Err(e) = res {
 		debug!("api: post_tx: failed with error: {}", e);
@@ -553,7 +552,7 @@ where
 	for tx_entry in last_unconfirmed_txs.iter().rev() {
 		if let Ok(tx) = w.get_stored_tx(tx_entry) {
 			if let Some(tx) = tx {
-				let tx_hex = grin_util::to_hex(ser::ser_vec(&tx).unwrap());
+				let tx_hex = grin_util::to_hex(grin_core::ser::ser_vec(&tx).unwrap());
 				if let Ok(_) = w.w2n_client().post_tx(&TxWrapper { tx_hex }, fluff) {
 					debug!(
 						"repost_last_txs: tx {} successfully posted. slate_id: {} fluff: {}",

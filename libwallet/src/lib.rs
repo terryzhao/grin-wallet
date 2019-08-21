@@ -50,6 +50,7 @@ pub mod listener;
 mod slate;
 pub mod slate_versions;
 mod types;
+pub mod wallet_ser;
 
 pub use crate::error::{Error, ErrorKind};
 pub use crate::slate::{ParticipantData, ParticipantMessageData, Slate};
