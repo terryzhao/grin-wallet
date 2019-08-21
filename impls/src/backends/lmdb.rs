@@ -32,8 +32,8 @@ use crate::core::core::Transaction;
 use crate::core::{self, global};
 use crate::libwallet::{check_repair, check_repair_batch, restore, restore_batch};
 use crate::libwallet::{
-	AcctPathMapping, Context, Error, ErrorKind, Listener, NodeClient, OutputData, PaymentCommits,
-	PaymentData, TxLogEntry, TxProof, WalletBackend, WalletOutputBatch,
+	AcctPathMapping, Context, Error, ErrorKind, Listener, NodeClient, OutputData, PaymentData,
+	TxLogEntry, TxProof, WalletBackend, WalletOutputBatch,
 };
 use crate::util;
 use crate::util::secp::constants::SECRET_KEY_SIZE;
@@ -47,7 +47,6 @@ pub const TX_PROOF_SAVE_DIR: &'static str = "saved_proofs";
 
 const OUTPUT_PREFIX: u8 = 'o' as u8;
 const PAYMENT_PREFIX: u8 = 'P' as u8;
-const PAYMENT_COMMITS_PREFIX: u8 = 'Q' as u8;
 const DERIV_PREFIX: u8 = 'd' as u8;
 const CONFIRMED_HEIGHT_PREFIX: u8 = 'c' as u8;
 const PRIVATE_TX_CONTEXT_PREFIX: u8 = 'p' as u8;
@@ -279,17 +278,15 @@ where
 		Box::new(self.db.iter(&[OUTPUT_PREFIX]).unwrap().map(|o| o.1))
 	}
 
-	fn get_payment_log_commits(&self, u: &Uuid) -> Result<Option<PaymentCommits>, Error> {
-		let key = to_key(PAYMENT_COMMITS_PREFIX, &mut u.as_bytes().to_vec());
-		self.db.get_ser(&key).map_err(|e| e.into())
+	fn payment_entries_iter_tx<'a>(
+		&'a self,
+		u: &Uuid,
+	) -> Box<dyn Iterator<Item = PaymentData> + 'a> {
+		let key = to_key(PAYMENT_PREFIX, &mut u.as_bytes().to_vec());
+		Box::new(self.db.iter(&key).unwrap().map(|o| o.1))
 	}
 
-	fn get_payment_log_entry(&self, commit: String) -> Result<Option<PaymentData>, Error> {
-		let key = to_key(PAYMENT_PREFIX, &mut commit.as_bytes().to_vec());
-		self.db.get_ser(&key).map_err(|e| e.into())
-	}
-
-	fn payment_log_iter<'a>(&'a self) -> Box<dyn Iterator<Item = PaymentData> + 'a> {
+	fn payment_entries_iter_all<'a>(&'a self) -> Box<dyn Iterator<Item = PaymentData> + 'a> {
 		Box::new(self.db.iter(&[PAYMENT_PREFIX]).unwrap().map(|o| o.1))
 	}
 
@@ -508,30 +505,21 @@ where
 		Ok(())
 	}
 
-	fn save_payment_commits(&mut self, u: &Uuid, commits: PaymentCommits) -> Result<(), Error> {
-		// Save the payment commits list data to the db.
-		{
-			let key = to_key(PAYMENT_COMMITS_PREFIX, &mut u.as_bytes().to_vec());
-			self.db.borrow().as_ref().unwrap().put_ser(&key, &commits)?;
-		}
-
-		Ok(())
-	}
-
 	fn save_payment(&mut self, out: PaymentData) -> Result<(), Error> {
 		// Save the payment output data to the db.
 		{
-			let commit = out.commit.clone();
-			let key = to_key(PAYMENT_PREFIX, &mut commit.as_bytes().to_vec());
+			let mut slate_id_commit = out.slate_id.clone().as_bytes().to_vec();
+			slate_id_commit.extend_from_slice(&out.commit.clone().as_ref().to_vec());
+
+			let key = to_key(PAYMENT_PREFIX, &mut slate_id_commit);
 			self.db.borrow().as_ref().unwrap().put_ser(&key, &out)?;
 		}
 
 		Ok(())
 	}
 
-	fn delete_payment(&mut self, out: &PaymentData) -> Result<(), Error> {
-		let commit = out.commit.clone();
-		let key = to_key(PAYMENT_PREFIX, &mut commit.as_bytes().to_vec());
+	fn delete_payment(&mut self, u: &Uuid) -> Result<(), Error> {
+		let key = to_key(PAYMENT_PREFIX, &mut u.as_bytes().to_vec());
 		let _ = self.db.borrow().as_ref().unwrap().delete(&key);
 		Ok(())
 	}
@@ -548,22 +536,17 @@ where
 		.map_err(|e| e.into())
 	}
 
-	fn get_payment_commits(&self, u: &Uuid) -> Result<PaymentCommits, Error> {
-		let key = to_key(PAYMENT_COMMITS_PREFIX, &mut u.as_bytes().to_vec());
-		option_to_not_found(
-			self.db.borrow().as_ref().unwrap().get_ser(&key),
-			&format!("slate_id: {}", u.to_string()),
+	fn payment_entries_iter_tx(&self, u: &Uuid) -> Box<dyn Iterator<Item = PaymentData>> {
+		let key = to_key(PAYMENT_PREFIX, &mut u.as_bytes().to_vec());
+		Box::new(
+			self.db
+				.borrow()
+				.as_ref()
+				.unwrap()
+				.iter(&key)
+				.unwrap()
+				.map(|o| o.1),
 		)
-		.map_err(|e| e.into())
-	}
-
-	fn get_payment_log_entry(&self, commit: String) -> Result<PaymentData, Error> {
-		let key = to_key(PAYMENT_PREFIX, &mut commit.as_bytes().to_vec());
-		option_to_not_found(
-			self.db.borrow().as_ref().unwrap().get_ser(&key),
-			&format!("key: {:?}", commit),
-		)
-		.map_err(|e| e.into())
 	}
 
 	fn iter(&self) -> Box<dyn Iterator<Item = OutputData>> {

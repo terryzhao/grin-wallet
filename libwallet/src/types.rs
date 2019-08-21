@@ -105,14 +105,14 @@ where
 	/// Iterate over all self output data stored by the backend
 	fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = OutputData> + 'a>;
 
-	/// Get payment commits list by slate id
-	fn get_payment_log_commits(&self, u: &Uuid) -> Result<Option<PaymentCommits>, Error>;
-
-	/// Get payment output data by commit
-	fn get_payment_log_entry(&self, commit: String) -> Result<Option<PaymentData>, Error>;
+	/// Get payment output data entries by slate id
+	fn payment_entries_iter_tx<'a>(
+		&'a self,
+		u: &Uuid,
+	) -> Box<dyn Iterator<Item = PaymentData> + 'a>;
 
 	/// Iterate over all payment output data stored by the backend
-	fn payment_log_iter<'a>(&'a self) -> Box<dyn Iterator<Item = PaymentData> + 'a>;
+	fn payment_entries_iter_all<'a>(&'a self) -> Box<dyn Iterator<Item = PaymentData> + 'a>;
 
 	/// Get self owned output data by id
 	fn get(&self, id: &Identifier, mmr_index: &Option<u64>) -> Result<OutputData, Error>;
@@ -197,20 +197,14 @@ where
 	/// Add or update data about a payment output to the backend
 	fn save_payment(&mut self, out: PaymentData) -> Result<(), Error>;
 
-	/// Delete a payment output to the backend
-	fn delete_payment(&mut self, out: &PaymentData) -> Result<(), Error>;
-
-	/// Add or update data about a payment commits list to the backend
-	fn save_payment_commits(&mut self, u: &Uuid, commits: PaymentCommits) -> Result<(), Error>;
+	/// Delete the payment output entries of a tx to the backend
+	fn delete_payment(&mut self, u: &Uuid) -> Result<(), Error>;
 
 	/// Gets self owned output data by id
 	fn get(&self, id: &Identifier, mmr_index: &Option<u64>) -> Result<OutputData, Error>;
 
-	/// Gets payment commits list by slate id
-	fn get_payment_commits(&self, u: &Uuid) -> Result<PaymentCommits, Error>;
-
-	/// Gets payment output data by commit
-	fn get_payment_log_entry(&self, commit: String) -> Result<PaymentData, Error>;
+	/// Gets payment output data entries by slate id
+	fn payment_entries_iter_tx(&self, u: &Uuid) -> Box<dyn Iterator<Item = PaymentData>>;
 
 	/// Iterate over all output data stored by the backend
 	fn iter(&self) -> Box<dyn Iterator<Item = OutputData>>;
@@ -468,10 +462,14 @@ impl OutputData {
 /// Information about a payment output that's being tracked by the wallet.
 /// It belongs to the receiver, and it's paid by this wallet.
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct PaymentData {
 	/// The actual commit
-	pub commit: String,
+	#[serde(
+		serialize_with = "secp_ser::as_hex",
+		deserialize_with = "secp_ser::commitment_from_hex"
+	)]
+	pub commit: pedersen::Commitment,
 	/// Value of the output
 	pub value: u64,
 	/// Current status of the output
@@ -522,33 +520,6 @@ impl PaymentData {
 			OutputStatus::Unconfirmed => self.status = OutputStatus::Confirmed,
 			_ => (),
 		}
-	}
-}
-
-/// Information about the payment commit/s in one tx that's being tracked by the wallet.
-/// They belong to the receiver/s, and they're paid by this wallet.
-///
-/// Note: because lmdb can't have multiple keys to same value, we have to use this to find
-/// the commit lists by the slate id, in case we support multiple receivers in one tx in the future.
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct PaymentCommits {
-	/// The actual commit/s
-	pub commits: Vec<String>,
-	/// Unique transaction ID, selected by sender
-	pub slate_id: Uuid,
-}
-
-impl ser::Writeable for PaymentCommits {
-	fn write<W: ser::Writer>(&self, writer: &mut W) -> Result<(), ser::Error> {
-		writer.write_bytes(&serde_json::to_vec(self).map_err(|_| ser::Error::CorruptedData)?)
-	}
-}
-
-impl ser::Readable for PaymentCommits {
-	fn read(reader: &mut dyn ser::Reader) -> Result<PaymentCommits, ser::Error> {
-		let data = reader.read_bytes_len_prefix()?;
-		serde_json::from_slice(&data[..]).map_err(|_| ser::Error::CorruptedData)
 	}
 }
 

@@ -24,8 +24,7 @@ use crate::grin_util::{to_hex, Mutex};
 use crate::internal::{selection, updater};
 use crate::slate::Slate;
 use crate::types::{
-	Context, NodeClient, OutputStatus, PaymentCommits, PaymentData, TxLogEntryType, TxProof,
-	WalletBackend,
+	Context, NodeClient, OutputStatus, PaymentData, TxLogEntryType, TxProof, WalletBackend,
 };
 use crate::{Error, ErrorKind};
 
@@ -271,28 +270,17 @@ where
 		let mut outputs: Vec<pedersen::Commitment> = Vec::new();
 		for output in slate.tx.outputs() {
 			if !change_commits.contains(&output.commit) {
-				outputs.insert(0, output.commit.clone());
+				outputs.push(output.commit.clone());
 			}
 		}
 
 		// sender save the payment output
 		let mut batch = wallet.batch()?;
-		batch.save_payment_commits(
-			&slate.id,
-			PaymentCommits {
-				commits: outputs
-					.iter()
-					.map(|c| to_hex(c.as_ref().to_vec()))
-					.collect::<Vec<String>>(),
-				slate_id: slate.id,
-			},
-		)?;
-		// todo: multiple receivers transaction
+		// todo: value of multiple receiver outputs. use '0' at this moment.
 		if outputs.len() > 1 {
 			for output in outputs {
-				let payment_output = to_hex(output.clone().as_ref().to_vec());
 				batch.save_payment(PaymentData {
-					commit: payment_output,
+					commit: output,
 					value: 0, // '0' means unknown here, since '0' value is impossible for an output.
 					status: OutputStatus::Unconfirmed,
 					height: slate.height,
@@ -301,9 +289,8 @@ where
 				})?;
 			}
 		} else if outputs.len() == 1 {
-			let payment_output = to_hex(outputs.first().clone().unwrap().as_ref().to_vec());
 			batch.save_payment(PaymentData {
-				commit: payment_output,
+				commit: outputs[0],
 				value: slate.amount,
 				status: OutputStatus::Unconfirmed,
 				height: slate.height,

@@ -15,7 +15,7 @@
 use crate::core::core::{self, amount_to_hr_string};
 use crate::core::global;
 use crate::libwallet::{
-	AcctPathMapping, Error, OutputCommitMapping, OutputStatus, PaymentCommitMapping, TxLogEntry,
+	AcctPathMapping, Error, OutputCommitMapping, OutputStatus, PaymentData, TxLogEntry,
 	TxProofVerified, WalletInfo,
 };
 use crate::util;
@@ -139,7 +139,7 @@ pub fn payments(
 	account: &str,
 	cur_height: u64,
 	validated: bool,
-	outputs: Vec<PaymentCommitMapping>,
+	outputs: Vec<PaymentData>,
 	dark_background_color_scheme: bool,
 ) -> Result<(), Error> {
 	let title = format!(
@@ -167,19 +167,18 @@ pub fn payments(
 	let len = outputs.len();
 	for payment in outputs {
 		let commit = format!("{}", util::to_hex(payment.commit.as_ref().to_vec()));
-		let out = payment.output;
 
-		let height = format!("{}", out.height);
-		let lock_height = format!("{}", out.lock_height);
-		let status = format!("{}", out.status);
+		let height = format!("{}", payment.height);
+		let lock_height = format!("{}", payment.lock_height);
+		let status = format!("{}", payment.status);
 
-		let num_confirmations = format!("{}", out.num_confirmations(cur_height));
-		let value = if out.value == 0 {
+		let num_confirmations = format!("{}", payment.num_confirmations(cur_height));
+		let value = if payment.value == 0 {
 			"unknown".to_owned()
 		} else {
-			format!("{}", core::amount_to_hr_string(out.value, true))
+			format!("{}", core::amount_to_hr_string(payment.value, true))
 		};
-		let slate_id = format!("{}", out.slate_id);
+		let slate_id = format!("{}", payment.slate_id);
 
 		if dark_background_color_scheme {
 			table.add_row(row![

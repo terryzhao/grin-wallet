@@ -26,7 +26,7 @@ use crate::slate::Slate;
 use crate::types::{AcctPathMapping, NodeClient, TxLogEntry, TxWrapper, WalletBackend, WalletInfo};
 use crate::{Error, ErrorKind};
 use crate::{
-	InitTxArgs, IssueInvoiceTxArgs, NodeHeightResult, OutputCommitMapping, PaymentCommitMapping,
+	InitTxArgs, IssueInvoiceTxArgs, NodeHeightResult, OutputCommitMapping, PaymentData,
 	TxLogEntryType, TxProof,
 };
 
@@ -92,7 +92,7 @@ pub fn retrieve_payments<T: ?Sized, C, K>(
 	w: &mut T,
 	refresh_from_node: bool,
 	tx_id: Option<Uuid>,
-) -> Result<(bool, Vec<PaymentCommitMapping>), Error>
+) -> Result<(bool, Vec<PaymentData>), Error>
 where
 	T: WalletBackend<C, K>,
 	C: NodeClient,

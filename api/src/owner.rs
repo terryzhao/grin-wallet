@@ -29,7 +29,7 @@ use crate::keychain::{Identifier, Keychain};
 use crate::libwallet::api_impl::owner;
 use crate::libwallet::{
 	AcctPathMapping, Error, ErrorKind, InitTxArgs, IssueInvoiceTxArgs, NodeClient,
-	NodeHeightResult, OutputCommitMapping, PaymentCommitMapping, Slate, TxLogEntry, TxProof,
+	NodeHeightResult, OutputCommitMapping, PaymentData, Slate, TxLogEntry, TxProof,
 	TxProofVerified, WalletBackend, WalletInfo,
 };
 use crate::util::secp::key::PublicKey;
@@ -322,15 +322,12 @@ where
 	/// the transaction log entry of id `i`.
 	///
 	/// # Returns
-	/// * `(bool, Vec<PaymentCommitMapping>)` - A tuple:
+	/// * `(bool, Vec<PaymentData>)` - A tuple:
 	/// * The first `bool` element indicates whether the data was successfully
 	/// refreshed from the node (note this may be false even if the `refresh_from_node`
 	/// argument was set to `true`.
 	/// * The second element contains a vector of
-	/// [PaymentCommitMapping](../grin_wallet_libwallet/types/struct.PaymentCommitMapping.html)
-	/// of which each element is a mapping between the wallet's internal
 	/// [PaymentData](../grin_wallet_libwallet/types/struct.Output.html)
-	/// and the Output commitment
 	///
 	/// # Example
 	/// Set up as in [`new`](struct.Owner.html#method.new) method above.
@@ -343,7 +340,7 @@ where
 	///
 	/// let result = api_owner.retrieve_payments(update_from_node, tx_id);
 	///
-	/// if let Ok((was_updated, payment_mappings)) = result {
+	/// if let Ok((was_updated, payments)) = result {
 	///		//...
 	/// }
 	/// ```
@@ -352,7 +349,7 @@ where
 		&self,
 		refresh_from_node: bool,
 		tx_id: Option<Uuid>,
-	) -> Result<(bool, Vec<PaymentCommitMapping>), Error> {
+	) -> Result<(bool, Vec<PaymentData>), Error> {
 		let mut w = self.wallet.lock();
 		w.open_with_credentials()?;
 		let res = owner::retrieve_payments(&mut *w, refresh_from_node, tx_id);

@@ -19,7 +19,7 @@ use crate::grin_core::libtx::secp_ser;
 use crate::grin_keychain::Identifier;
 use crate::grin_util::secp::pedersen;
 use crate::slate_versions::SlateVersion;
-use crate::types::{OutputData, PaymentData};
+use crate::types::OutputData;
 
 /// Send TX API Args
 // TODO: This is here to ensure the legacy V1 API remains intact
@@ -197,19 +197,6 @@ pub struct CbData {
 pub struct OutputCommitMapping {
 	/// Output Data
 	pub output: OutputData,
-	/// The commit
-	#[serde(
-		serialize_with = "secp_ser::as_hex",
-		deserialize_with = "secp_ser::commitment_from_hex"
-	)]
-	pub commit: pedersen::Commitment,
-}
-
-/// Map PaymentData to commits
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct PaymentCommitMapping {
-	/// Payment Data
-	pub output: PaymentData,
 	/// The commit
 	#[serde(
 		serialize_with = "secp_ser::as_hex",

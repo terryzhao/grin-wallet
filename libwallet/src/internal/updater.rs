@@ -31,7 +31,7 @@ use crate::internal::keys;
 use crate::types::{
 	NodeClient, OutputData, OutputStatus, TxLogEntry, TxLogEntryType, WalletBackend, WalletInfo,
 };
-use crate::{BlockFees, CbData, OutputCommitMapping, PaymentCommitMapping};
+use crate::{BlockFees, CbData, OutputCommitMapping, PaymentData};
 
 /// Retrieve all of the outputs (doesn't attempt to update from node)
 pub fn retrieve_outputs<T: ?Sized, C, K>(
@@ -98,32 +98,24 @@ where
 pub fn retrieve_payments<T: ?Sized, C, K>(
 	wallet: &mut T,
 	tx_id: Option<Uuid>,
-) -> Result<Vec<PaymentCommitMapping>, Error>
+) -> Result<Vec<PaymentData>, Error>
 where
 	T: WalletBackend<C, K>,
 	C: NodeClient,
 	K: Keychain,
 {
 	// just read the wallet here, no need for a write lock
-	let mut outputs = wallet.payment_log_iter().collect::<Vec<_>>();
 
-	// only include outputs with a given tx_id if provided
-	if let Some(id) = tx_id {
-		outputs = outputs
-			.into_iter()
-			.filter(|out| out.slate_id == id)
-			.collect::<Vec<_>>();
-	}
+	let mut payments = if let Some(slate_id) = tx_id {
+		wallet
+			.payment_entries_iter_tx(&slate_id)
+			.collect::<Vec<_>>()
+	} else {
+		wallet.payment_entries_iter_all().collect::<Vec<_>>()
+	};
 
-	let res = outputs
-		.into_iter()
-		.map(|output| {
-			let commit =
-				pedersen::Commitment::from_vec(util::from_hex(output.commit.clone()).unwrap());
-			PaymentCommitMapping { output, commit }
-		})
-		.collect();
-	Ok(res)
+	payments.sort_by_key(|p| p.height);
+	Ok(payments)
 }
 
 /// Retrieve all of the transaction entries, or a particular entry
@@ -294,14 +286,8 @@ where
 	C: NodeClient,
 	K: Keychain,
 {
-	let payments = wallet
-		.payment_log_iter()
-		.filter(|p| p.slate_id == tx_slate_id)
-		.collect::<Vec<_>>();
 	let mut batch = wallet.batch()?;
-	for payment in &payments {
-		batch.delete_payment(payment)?;
-	}
+	batch.delete_payment(&tx_slate_id)?;
 	batch.commit()?;
 	Ok(())
 }
@@ -382,16 +368,14 @@ where
 							if !is_canceled_tx {
 								// if there's a related payment output being confirmed, refresh that payment log
 								if let Some(slate_id) = output.slate_id {
-									if let Ok(commits) = batch.get_payment_commits(&slate_id) {
-										for commit in commits.commits {
-											if let Ok(mut payment) =
-												batch.get_payment_log_entry(commit.clone())
-											{
-												payment.height = o.1;
-												payment.mark_confirmed();
-												batch.save_payment(payment)?;
-											}
-										}
+									let payment_entries = batch
+										.payment_entries_iter_tx(&slate_id)
+										.collect::<Vec<_>>();
+
+									for mut payment in payment_entries {
+										payment.height = o.1;
+										payment.mark_confirmed();
+										batch.save_payment(payment)?;
 									}
 								}
 							}
@@ -467,16 +451,14 @@ where
 
 								// refresh the payment log
 								if let Some(slate_id) = tx_entry.tx_slate_id {
-									if let Ok(commits) = batch.get_payment_commits(&slate_id) {
-										for commit in commits.commits {
-											if let Ok(mut payment) =
-												batch.get_payment_log_entry(commit.clone())
-											{
-												payment.height = tx_kernel_api_entry.height;
-												payment.mark_confirmed();
-												batch.save_payment(payment)?;
-											}
-										}
+									let payment_entries = batch
+										.payment_entries_iter_tx(&slate_id)
+										.collect::<Vec<_>>();
+
+									for mut payment in payment_entries {
+										payment.height = tx_kernel_api_entry.height;
+										payment.mark_confirmed();
+										batch.save_payment(payment)?;
 									}
 								}
 							}

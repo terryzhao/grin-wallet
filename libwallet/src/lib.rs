@@ -59,12 +59,12 @@ pub use crate::slate_versions::{
 };
 pub use api_impl::types::{
 	BlockFees, CbData, InitTxArgs, InitTxSendArgs, IssueInvoiceTxArgs, NodeHeightResult,
-	OutputCommitMapping, PaymentCommitMapping, SendTXArgs, VersionInfo,
+	OutputCommitMapping, SendTXArgs, VersionInfo,
 };
 pub use internal::restore::{check_repair, check_repair_batch, restore, restore_batch};
 pub use listener::Listener;
 pub use types::{
 	AcctPathMapping, BlockIdentifier, Context, NodeClient, NodeVersionInfo, OutputData,
-	OutputStatus, PaymentCommits, PaymentData, TxLogEntry, TxLogEntryType, TxProof,
-	TxProofVerified, TxWrapper, WalletBackend, WalletInfo, WalletInst, WalletOutputBatch,
+	OutputStatus, PaymentData, TxLogEntry, TxLogEntryType, TxProof, TxProofVerified, TxWrapper,
+	WalletBackend, WalletInfo, WalletInst, WalletOutputBatch,
 };

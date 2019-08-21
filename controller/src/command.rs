@@ -834,7 +834,7 @@ pub fn payments(
 		let mut filtered_outputs = if let Some(status) = args.status {
 			outputs
 				.into_iter()
-				.filter(|out| out.output.status == status)
+				.filter(|out| out.status == status)
 				.collect::<Vec<_>>()
 		} else {
 			outputs
