@@ -276,6 +276,15 @@ where
 
 		// sender save the payment output
 		let mut batch = wallet.batch()?;
+		let tx_id = if let Some(tx_entry) = batch
+			.tx_log_iter()
+			.find(|t| t.tx_slate_id == Some(slate.id) && t.parent_key_id == context.parent_key_id)
+		{
+			Some(tx_entry.id)
+		} else {
+			None
+		};
+
 		// todo: value of multiple receiver outputs. use '0' at this moment.
 		if outputs.len() > 1 {
 			for output in outputs {
@@ -286,6 +295,7 @@ where
 					height: slate.height,
 					lock_height: 0,
 					slate_id: slate.id,
+					id: tx_id,
 				})?;
 			}
 		} else if outputs.len() == 1 {
@@ -296,6 +306,7 @@ where
 				height: slate.height,
 				lock_height: 0,
 				slate_id: slate.id,
+				id: tx_id,
 			})?;
 		} else {
 			warn!("complete_tx - no 'payment' output! is this a sending to self for test purpose?");

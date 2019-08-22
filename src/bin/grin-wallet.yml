@@ -271,6 +271,10 @@ subcommands:
             short: i
             long: id
             takes_value: true
+        - raw:
+            help: Show the raw transaction data (if have) in json format if tx id is specified.
+            short: r
+            long: raw
         - type:
             help: Filter txs by tx type (coinbase/rx/tx/rxc/txc, means Coinbase/Received/Sent/ReceivedCanceled/SentCanceled)
             short: t

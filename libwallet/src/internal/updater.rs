@@ -114,7 +114,7 @@ where
 		wallet.payment_entries_iter_all().collect::<Vec<_>>()
 	};
 
-	payments.sort_by_key(|p| p.height);
+	payments.sort_by(|a, b| a.height.cmp(&b.height).then(a.id.cmp(&b.id)));
 	Ok(payments)
 }
 

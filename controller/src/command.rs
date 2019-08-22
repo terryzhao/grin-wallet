@@ -863,6 +863,7 @@ pub fn payments(
 /// Txs command args
 pub struct TxsArgs {
 	pub id: Option<u32>,
+	pub show_raw_tx_data: bool,
 	pub tx_type: Option<TxLogEntryType>,
 	pub start_date: Option<DateTime>,
 	pub end_date: Option<DateTime>,
@@ -943,6 +944,17 @@ pub fn txs(
 			// should only be one here, but just in case
 			for tx in &filtered_txs {
 				display::tx_messages(tx, dark_scheme)?;
+			}
+
+			if args.show_raw_tx_data {
+				if filtered_txs.len() == 1 && filtered_txs[0].stored_tx.is_some() {
+					if let Some(stored_tx) = api.get_stored_tx(&filtered_txs[0])? {
+						println!();
+						println!("{}", "The raw transaction data:".magenta());
+						println!("{}", json::to_string_pretty(&stored_tx).unwrap());
+						println!();
+					}
+				}
 			}
 		};
 		Ok(())

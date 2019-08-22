@@ -90,32 +90,65 @@ pub fn outputs(
 			Some(t) => t.to_string(),
 		};
 
-		if dark_background_color_scheme {
-			table.add_row(row![
-				bFC->commit,
-				bFB->index,
-				bFB->height,
-				bFB->lock_height,
-				bFR->status,
-				bFY->is_coinbase,
-				bFY->is_change,
-				bFB->num_confirmations,
-				bFG->value,
-				bFC->tx,
-			]);
-		} else {
-			table.add_row(row![
-				bFD->commit,
-				bFB->index,
-				bFB->height,
-				bFB->lock_height,
-				bFR->status,
-				bFD->is_coinbase,
-				bFD->is_change,
-				bFB->num_confirmations,
-				bFG->value,
-				bFD->tx,
-			]);
+		match m.output.status {
+			OutputStatus::Unspent => {
+				if dark_background_color_scheme {
+					table.add_row(row![
+						bFC->commit,
+						bFB->index,
+						bFB->height,
+						bFB->lock_height,
+						bFG->status,
+						bFY->is_coinbase,
+						bFY->is_change,
+						bFB->num_confirmations,
+						bFG->value,
+						bFC->tx,
+					]);
+				} else {
+					table.add_row(row![
+						bFD->commit,
+						bFB->index,
+						bFB->height,
+						bFB->lock_height,
+						bFG->status,
+						bFD->is_coinbase,
+						bFD->is_change,
+						bFB->num_confirmations,
+						bFG->value,
+						bFD->tx,
+					]);
+				}
+			}
+			_ => {
+				if dark_background_color_scheme {
+					table.add_row(row![
+						bFC->commit,
+						bFB->index,
+						bFB->height,
+						bFB->lock_height,
+						bFR->status,
+						bFY->is_coinbase,
+						bFY->is_change,
+						bFB->num_confirmations,
+						bFG->value,
+						bFC->tx,
+					]);
+				} else {
+					table.add_row(row![
+						bFD->commit,
+						bFB->index,
+						bFB->height,
+						bFB->lock_height,
+						bFR->status,
+						bFD->is_coinbase,
+						bFD->is_change,
+						bFB->num_confirmations,
+						bFG->value,
+						bFD->tx,
+					]);
+				}
+			}
 		}
 	}
 
@@ -158,19 +191,29 @@ pub fn payments(
 		bMG->"Output Commitment",
 		bMG->"Block Height",
 		bMG->"Locked Until",
-		bMG->"Status",
+		bMG->"Confirmed?",
 		bMG->"# Confirms",
 		bMG->"Value",
-		bMG->"Shared Transaction Id"
+		bMG->"Shared Transaction Id",
+		bMG->"TxId",
 	]);
 
 	let len = outputs.len();
+	let mut sum = 0;
 	for payment in outputs {
+		sum += payment.value;
 		let commit = format!("{}", util::to_hex(payment.commit.as_ref().to_vec()));
 
 		let height = format!("{}", payment.height);
 		let lock_height = format!("{}", payment.lock_height);
-		let status = format!("{}", payment.status);
+		let status = format!(
+			"{}",
+			if payment.status == OutputStatus::Confirmed {
+				"Yes"
+			} else {
+				"No"
+			}
+		);
 
 		let num_confirmations = format!("{}", payment.num_confirmations(cur_height));
 		let value = if payment.value == 0 {
@@ -179,34 +222,79 @@ pub fn payments(
 			format!("{}", core::amount_to_hr_string(payment.value, true))
 		};
 		let slate_id = format!("{}", payment.slate_id);
+		let tx_id = format!(
+			"{}",
+			if let Some(id) = payment.id {
+				id.to_string()
+			} else {
+				"".to_string()
+			}
+		);
 
-		if dark_background_color_scheme {
-			table.add_row(row![
-				bFC->commit,
-				bFB->height,
-				bFB->lock_height,
-				bFR->status,
-				bFB->num_confirmations,
-				bFG->value,
-				bFC->slate_id,
-			]);
-		} else {
-			table.add_row(row![
-				bFD->commit,
-				bFB->height,
-				bFB->lock_height,
-				bFR->status,
-				bFB->num_confirmations,
-				bFG->value,
-				bFD->slate_id,
-			]);
+		match payment.status {
+			OutputStatus::Confirmed => {
+				if dark_background_color_scheme {
+					table.add_row(row![
+						bFC->commit,
+						bFB->height,
+						bFB->lock_height,
+						bFG->status,
+						bFB->num_confirmations,
+						bFG->value,
+						bFC->slate_id,
+						bFC->tx_id,
+					]);
+				} else {
+					table.add_row(row![
+						bFD->commit,
+						bFB->height,
+						bFB->lock_height,
+						bFG->status,
+						bFB->num_confirmations,
+						bFG->value,
+						bFD->slate_id,
+						bFD->tx_id,
+					]);
+				}
+			}
+			_ => {
+				if dark_background_color_scheme {
+					table.add_row(row![
+						bFC->commit,
+						bFB->height,
+						bFB->lock_height,
+						bFR->status,
+						bFB->num_confirmations,
+						bFG->value,
+						bFC->slate_id,
+						bFC->tx_id,
+					]);
+				} else {
+					table.add_row(row![
+						bFD->commit,
+						bFB->height,
+						bFB->lock_height,
+						bFR->status,
+						bFB->num_confirmations,
+						bFG->value,
+						bFD->slate_id,
+						bFD->tx_id,
+					]);
+				}
+			}
 		}
 	}
 
 	table.set_format(*prettytable::format::consts::FORMAT_NO_COLSEP);
 	table.printstd();
-	println!();
-	println!("total displayed payments: {}", len);
+	if len > 1 {
+		println!();
+		println!("total displayed payments:\t{}", len);
+		println!(
+			"total displayed values: \t{}",
+			core::amount_to_hr_string(sum, true)
+		);
+	}
 
 	if !validated {
 		println!(
@@ -249,7 +337,6 @@ pub fn txs(
 		bMG->"Shared Transaction Id",
 		bMG->"Creation Time",
 		bMG->"Confirmed?",
-		// bMG->"Confirmation Time",
 		bMG->"# Confirms",
 		bMG->"Num. \nInputs",
 		bMG->"Num. \nOutputs",
@@ -258,9 +345,17 @@ pub fn txs(
 		bMG->"Fee",
 		bMG->"Net \nDifference",
 		bMG->"Tx \nData",
+		bMG->"With \nProof",
 	]);
 
+	let mut total_fee = 0;
+	let mut total_amount_credited = 0;
+	let mut total_amount_debited = 0;
 	for t in txs {
+		total_fee += if let Some(fee) = t.fee { fee } else { 0 };
+		total_amount_credited += t.amount_credited;
+		total_amount_debited += t.amount_debited;
+
 		let id = format!("{}", t.id);
 		let slate_id = match t.tx_slate_id {
 			Some(m) => format!("{}", m),
@@ -268,11 +363,7 @@ pub fn txs(
 		};
 		let entry_type = format!("{}", t.tx_type);
 		let creation_ts = format!("{}", t.creation_ts.format("%Y-%m-%d %H:%M:%S"));
-		let _confirmation_ts = match t.confirmation_ts {
-			Some(m) => format!("{}", m.format("%Y-%m-%d %H:%M:%S")),
-			None => "None".to_owned(),
-		};
-		let confirmed = format!("{}", t.confirmed);
+		let confirmed = format!("{}", if t.confirmed { "Yes" } else { "No" });
 		let num_confirmations = format!("{}", t.num_confirmations(cur_height));
 		let num_inputs = format!("{}", t.num_inputs);
 		let num_outputs = format!("{}", t.num_outputs);
@@ -292,68 +383,109 @@ pub fn txs(
 		};
 		let tx_data = match t.stored_tx {
 			Some(_) => "Yes".to_owned(),
-			None => "None".to_owned(),
+			None => "".to_owned(),
 		};
-		if dark_background_color_scheme {
-			table.add_row(row![
-				bFC->id,
-				bFC->entry_type,
-				bFC->slate_id,
-				bFB->creation_ts,
-				bFC->confirmed,
-				// bFB->confirmation_ts,
-				bFB->num_confirmations,
-				bFC->num_inputs,
-				bFC->num_outputs,
-				bFG->amount_credited_str,
-				bFR->amount_debited_str,
-				bFR->fee,
-				bFY->net_diff,
-				bFb->tx_data,
-			]);
-		} else {
-			if t.confirmed {
-				table.add_row(row![
-					bFD->id,
-					bFb->entry_type,
-					bFD->slate_id,
-					bFB->creation_ts,
-					bFg->confirmed,
-					// bFB->confirmation_ts,
-					bFB->num_confirmations,
-					bFD->num_inputs,
-					bFD->num_outputs,
-					bFG->amount_credited_str,
-					bFD->amount_debited_str,
-					bFD->fee,
-					bFG->net_diff,
-					bFB->tx_data,
-				]);
-			} else {
-				table.add_row(row![
-					bFD->id,
-					bFb->entry_type,
-					bFD->slate_id,
-					bFB->creation_ts,
-					bFR->confirmed,
-					// bFB->confirmation_ts,
-					bFB->num_confirmations,
-					bFD->num_inputs,
-					bFD->num_outputs,
-					bFG->amount_credited_str,
-					bFD->amount_debited_str,
-					bFD->fee,
-					bFG->net_diff,
-					bFB->tx_data,
-				]);
+		let proof_data = match t.grinrelay_key_path {
+			Some(_) => "Yes".to_owned(),
+			None => "".to_owned(),
+		};
+		match t.confirmed {
+			true => {
+				if dark_background_color_scheme {
+					table.add_row(row![
+						bFC->id,
+						bFC->entry_type,
+						bFC->slate_id,
+						bFB->creation_ts,
+						bFg->confirmed,
+						bFB->num_confirmations,
+						bFC->num_inputs,
+						bFC->num_outputs,
+						bFG->amount_credited_str,
+						bFR->amount_debited_str,
+						bFR->fee,
+						bFY->net_diff,
+						bFb->tx_data,
+						bFC->proof_data,
+					]);
+				} else {
+					table.add_row(row![
+						bFD->id,
+						bFb->entry_type,
+						bFD->slate_id,
+						bFB->creation_ts,
+						bFg->confirmed,
+						bFB->num_confirmations,
+						bFD->num_inputs,
+						bFD->num_outputs,
+						bFG->amount_credited_str,
+						bFD->amount_debited_str,
+						bFD->fee,
+						bFG->net_diff,
+						bFB->tx_data,
+						bFD->proof_data,
+					]);
+				}
+			}
+			false => {
+				if dark_background_color_scheme {
+					table.add_row(row![
+						bFC->id,
+						bFC->entry_type,
+						bFC->slate_id,
+						bFB->creation_ts,
+						bFC->confirmed,
+						bFB->num_confirmations,
+						bFC->num_inputs,
+						bFC->num_outputs,
+						bFG->amount_credited_str,
+						bFR->amount_debited_str,
+						bFR->fee,
+						bFY->net_diff,
+						bFb->tx_data,
+						bFC->proof_data,
+					]);
+				} else {
+					table.add_row(row![
+						bFD->id,
+						bFb->entry_type,
+						bFD->slate_id,
+						bFB->creation_ts,
+						bFR->confirmed,
+						bFB->num_confirmations,
+						bFD->num_inputs,
+						bFD->num_outputs,
+						bFG->amount_credited_str,
+						bFD->amount_debited_str,
+						bFD->fee,
+						bFG->net_diff,
+						bFB->tx_data,
+						bFD->proof_data,
+					]);
+				}
 			}
 		}
 	}
 
 	table.set_format(*prettytable::format::consts::FORMAT_NO_COLSEP);
 	table.printstd();
-	println!();
-	println!("total displayed txs: {}", txs.len());
+	if txs.len() > 1 {
+		println!();
+		println!("total displayed txs:\t{}", txs.len());
+		println!(
+			"total displayed fee:\t{}",
+			core::amount_to_hr_string(total_fee, true)
+		);
+		let total_net_diff = if total_amount_credited >= total_amount_debited {
+			core::amount_to_hr_string(total_amount_credited - total_amount_debited, true)
+		} else {
+			format!(
+				"-{}",
+				core::amount_to_hr_string(total_amount_debited - total_amount_credited, true)
+			)
+		};
+		println!("total net difference:\t{}", total_net_diff);
+	}
 
 	if !validated && include_status {
 		println!(

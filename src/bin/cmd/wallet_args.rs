@@ -838,6 +838,7 @@ pub fn parse_txs_args(args: &ArgMatches) -> Result<command::TxsArgs, ParseError>
 		None => None,
 		Some(tx) => Some(parse_u64(tx, "id")? as u32),
 	};
+	let raw = args.is_present("raw");
 	let tx_type = match args.value_of("type") {
 		None => None,
 		Some(tx_type) => Some(parse_tx_type(tx_type, "type")? as TxLogEntryType),
@@ -856,6 +857,7 @@ pub fn parse_txs_args(args: &ArgMatches) -> Result<command::TxsArgs, ParseError>
 	};
 	Ok(command::TxsArgs {
 		id: tx_id,
+		show_raw_tx_data: raw,
 		tx_type,
 		start_date,
 		end_date,
