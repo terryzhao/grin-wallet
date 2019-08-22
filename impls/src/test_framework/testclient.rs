@@ -105,6 +105,7 @@ where
 			pow::verify_size,
 			verifier_cache,
 			false,
+			true,
 		)
 		.unwrap();
 		let (tx, rx) = channel();
