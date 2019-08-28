@@ -1,7 +1,7 @@
 [package]
 name = "grin_wallet_relay"
 version = "2.0.1-beta.3"
-authors = ["Gary Yu <gairy.yu@gmail.com>"]
+authors = ["Gotts Developers <gotts.tech@lists.launchpad.net>"]
 description = "Grin Relay API"
 license = "Apache-2.0"
 repository = "https://github.com/gottstech/grin-wallet"
