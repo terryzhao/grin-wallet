@@ -22,7 +22,7 @@ use crate::crypto::AddrBech32;
 use crate::error::ErrorKind;
 use crate::grin_util::secp::key::PublicKey;
 use crate::Result;
-use grin_wallet_util::grin_core::global::is_mainnet;
+use grin_wallet_util::grin_core::global::{ChainTypes, CHAIN_TYPE};
 
 pub const GRINRELAY_PREFIX: &str = "grinrelay://";
 pub const GRINRELAY_ADDRESS_REGEX: &str = r"^(grinrelay://)?(?P<public_key>[0-9a-z\-]{62,67})(@(?P<domain>[a-zA-Z0-9\.]+)(:(?P<port>[0-9]*))?)?$";
@@ -31,6 +31,12 @@ pub const GRINRELAY_ADDRESS_HRP_MAINNET: &str = "gn";
 pub const GRINRELAY_ADDRESS_HRP_TESTNET: &str = "tn";
 pub const DEFAULT_GRINRELAY_DOMAIN: &str = "relay.grin.icu";
 pub const DEFAULT_GRINRELAY_PORT: u16 = 3418;
+
+/// Are we in mainnet?
+pub fn is_mainnet() -> bool {
+	let param_ref = CHAIN_TYPE.read();
+	ChainTypes::Mainnet == *param_ref
+}
 
 pub fn hrp_bytes() -> Vec<u8> {
 	if is_mainnet() {

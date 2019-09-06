@@ -17,9 +17,11 @@ use uuid::Uuid;
 
 use crate::core::core::Transaction;
 use crate::keychain::{Identifier, Keychain};
+use crate::libwallet::slate_versions::v2::TransactionV2;
 use crate::libwallet::{
 	AcctPathMapping, ErrorKind, InitTxArgs, IssueInvoiceTxArgs, NodeClient, NodeHeightResult,
-	OutputCommitMapping, Slate, TxLogEntry, WalletBackend, WalletInfo,
+	OutputCommitMapping, Slate, SlateVersion, TxLogEntry, VersionedSlate, WalletBackend,
+	WalletInfo,
 };
 use crate::Owner;
 use easy_jsonrpc;
@@ -413,7 +415,7 @@ pub trait OwnerRpc {
 	```
 	*/
 
-	fn init_send_tx(&self, args: InitTxArgs) -> Result<Slate, ErrorKind>;
+	fn init_send_tx(&self, args: InitTxArgs) -> Result<VersionedSlate, ErrorKind>;
 
 	/**
 		Networked version of [Owner::issue_invoice_tx](struct.Owner.html#method.issue_invoice_tx).
@@ -493,7 +495,7 @@ pub trait OwnerRpc {
 	```
 	*/
 
-	fn issue_invoice_tx(&self, args: IssueInvoiceTxArgs) -> Result<Slate, ErrorKind>;
+	fn issue_invoice_tx(&self, args: IssueInvoiceTxArgs) -> Result<VersionedSlate, ErrorKind>;
 
 	/**
 		 Networked version of [Owner::process_invoice_tx](struct.Owner.html#method.process_invoice_tx).
@@ -641,7 +643,11 @@ pub trait OwnerRpc {
 	```
 	*/
 
-	fn process_invoice_tx(&self, slate: &Slate, args: InitTxArgs) -> Result<Slate, ErrorKind>;
+	fn process_invoice_tx(
+		&self,
+		slate: VersionedSlate,
+		args: InitTxArgs,
+	) -> Result<VersionedSlate, ErrorKind>;
 
 	/**
 	Networked version of [Owner::tx_lock_outputs](struct.Owner.html#method.tx_lock_outputs).
@@ -721,7 +727,11 @@ pub trait OwnerRpc {
 
 	```
 	 */
-	fn tx_lock_outputs(&self, slate: Slate, participant_id: usize) -> Result<(), ErrorKind>;
+	fn tx_lock_outputs(
+		&self,
+		slate: VersionedSlate,
+		participant_id: usize,
+	) -> Result<(), ErrorKind>;
 
 	/**
 	Networked version of [Owner::finalize_tx](struct.Owner.html#method.finalize_tx).
@@ -883,7 +893,7 @@ pub trait OwnerRpc {
 	# , 5, true, true, false);
 	```
 	 */
-	fn finalize_tx(&self, slate: Slate) -> Result<Slate, ErrorKind>;
+	fn finalize_tx(&self, slate: VersionedSlate) -> Result<VersionedSlate, ErrorKind>;
 
 	/**
 	Networked version of [Owner::post_tx](struct.Owner.html#method.post_tx).
@@ -954,7 +964,7 @@ pub trait OwnerRpc {
 	fn post_tx(
 		&self,
 		tx_slate_id: Option<Uuid>,
-		tx: &Transaction,
+		tx: &TransactionV2,
 		fluff: bool,
 	) -> Result<(), ErrorKind>;
 
@@ -1081,7 +1091,7 @@ pub trait OwnerRpc {
 	# , 5, true, true, false);
 	```
 	 */
-	fn get_stored_tx(&self, tx: &TxLogEntry) -> Result<Option<Transaction>, ErrorKind>;
+	fn get_stored_tx(&self, tx: &TxLogEntry) -> Result<Option<TransactionV2>, ErrorKind>;
 
 	/**
 	Networked version of [Owner::verify_slate_messages](struct.Owner.html#method.verify_slate_messages).
@@ -1159,7 +1169,7 @@ pub trait OwnerRpc {
 	# ,5 ,true, false, false);
 	```
 	*/
-	fn verify_slate_messages(&self, slate: &Slate) -> Result<(), ErrorKind>;
+	fn verify_slate_messages(&self, slate: VersionedSlate) -> Result<(), ErrorKind>;
 
 	/**
 	Networked version of [Owner::restore](struct.Owner.html#method.restore).
@@ -1297,45 +1307,65 @@ where
 			.map_err(|e| e.kind())
 	}
 
-	fn init_send_tx(&self, args: InitTxArgs) -> Result<Slate, ErrorKind> {
-		Owner::init_send_tx(self, args).map_err(|e| e.kind())
+	fn init_send_tx(&self, args: InitTxArgs) -> Result<VersionedSlate, ErrorKind> {
+		let slate = Owner::init_send_tx(self, args).map_err(|e| e.kind())?;
+		let version = SlateVersion::V2;
+		Ok(VersionedSlate::into_version(slate, version))
 	}
 
-	fn issue_invoice_tx(&self, args: IssueInvoiceTxArgs) -> Result<Slate, ErrorKind> {
-		Owner::issue_invoice_tx(self, args).map_err(|e| e.kind())
+	fn issue_invoice_tx(&self, args: IssueInvoiceTxArgs) -> Result<VersionedSlate, ErrorKind> {
+		let slate = Owner::issue_invoice_tx(self, args).map_err(|e| e.kind())?;
+		let version = SlateVersion::V2;
+		Ok(VersionedSlate::into_version(slate, version))
 	}
 
-	fn process_invoice_tx(&self, slate: &Slate, args: InitTxArgs) -> Result<Slate, ErrorKind> {
-		Owner::process_invoice_tx(self, slate, args).map_err(|e| e.kind())
+	fn process_invoice_tx(
+		&self,
+		in_slate: VersionedSlate,
+		args: InitTxArgs,
+	) -> Result<VersionedSlate, ErrorKind> {
+		let out_slate =
+			Owner::process_invoice_tx(self, &Slate::from(in_slate), args).map_err(|e| e.kind())?;
+		let version = SlateVersion::V2;
+		Ok(VersionedSlate::into_version(out_slate, version))
 	}
 
-	fn finalize_tx(&self, mut slate: Slate) -> Result<Slate, ErrorKind> {
-		Owner::finalize_tx(self, &mut slate, None, None).map_err(|e| e.kind())
+	fn finalize_tx(&self, in_slate: VersionedSlate) -> Result<VersionedSlate, ErrorKind> {
+		let out_slate =
+			Owner::finalize_tx(self, &Slate::from(in_slate), None, None).map_err(|e| e.kind())?;
+		let version = SlateVersion::V2;
+		Ok(VersionedSlate::into_version(out_slate, version))
 	}
 
-	fn tx_lock_outputs(&self, mut slate: Slate, participant_id: usize) -> Result<(), ErrorKind> {
-		Owner::tx_lock_outputs(self, &mut slate, participant_id).map_err(|e| e.kind())
+	fn tx_lock_outputs(
+		&self,
+		slate: VersionedSlate,
+		participant_id: usize,
+	) -> Result<(), ErrorKind> {
+		Owner::tx_lock_outputs(self, &Slate::from(slate), participant_id).map_err(|e| e.kind())
 	}
 
 	fn cancel_tx(&self, tx_id: Option<u32>, tx_slate_id: Option<Uuid>) -> Result<(), ErrorKind> {
 		Owner::cancel_tx(self, tx_id, tx_slate_id).map_err(|e| e.kind())
 	}
 
-	fn get_stored_tx(&self, tx: &TxLogEntry) -> Result<Option<Transaction>, ErrorKind> {
-		Owner::get_stored_tx(self, tx).map_err(|e| e.kind())
+	fn get_stored_tx(&self, tx: &TxLogEntry) -> Result<Option<TransactionV2>, ErrorKind> {
+		Owner::get_stored_tx(self, tx)
+			.map(|x| x.map(|y| TransactionV2::from(y)))
+			.map_err(|e| e.kind())
 	}
 
 	fn post_tx(
 		&self,
 		tx_slate_id: Option<Uuid>,
-		tx: &Transaction,
+		tx: &TransactionV2,
 		fluff: bool,
 	) -> Result<(), ErrorKind> {
-		Owner::post_tx(self, tx_slate_id, tx, fluff).map_err(|e| e.kind())
+		Owner::post_tx(self, tx_slate_id, &Transaction::from(tx), fluff).map_err(|e| e.kind())
 	}
 
-	fn verify_slate_messages(&self, slate: &Slate) -> Result<(), ErrorKind> {
-		Owner::verify_slate_messages(self, slate).map_err(|e| e.kind())
+	fn verify_slate_messages(&self, slate: VersionedSlate) -> Result<(), ErrorKind> {
+		Owner::verify_slate_messages(self, &Slate::from(slate)).map_err(|e| e.kind())
 	}
 
 	fn restore(&self) -> Result<(), ErrorKind> {

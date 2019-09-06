@@ -134,11 +134,13 @@ fn accounts_test_impl(test_dir: &str) -> Result<(), libwallet::Error> {
 		assert_eq!(txs.len(), 5);
 		Ok(())
 	})?;
+
 	// now check second account
 	{
 		let mut w = wallet1.lock();
 		w.set_parent_key_id_by_name("account1")?;
 	}
+
 	wallet::controller::owner_single_use(wallet1.clone(), |api| {
 		// check last confirmed height on this account is different from above (should be 0)
 		let (_, wallet1_info) = api.retrieve_summary_info(false, 1)?;
@@ -178,7 +180,6 @@ fn accounts_test_impl(test_dir: &str) -> Result<(), libwallet::Error> {
 		let mut w = wallet1.lock();
 		w.set_parent_key_id_by_name("account1")?;
 	}
-
 	wallet::controller::owner_single_use(wallet1.clone(), |api| {
 		let args = InitTxArgs {
 			src_acct_name: None,

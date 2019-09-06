@@ -21,36 +21,36 @@ toml = "0.4"
 dirs = "1.0.3"
 
 # For Release
-grin_core = { git = "https://github.com/gottstech/grin", tag = "v2.0.3" }
-grin_keychain = { git = "https://github.com/gottstech/grin", tag = "v2.0.3" }
-grin_chain = { git = "https://github.com/gottstech/grin", tag = "v2.0.3" }
-grin_util = { git = "https://github.com/gottstech/grin", tag = "v2.0.3" }
-grin_api = { git = "https://github.com/gottstech/grin", tag = "v2.0.3" }
-grin_store = { git = "https://github.com/gottstech/grin", tag = "v2.0.3" }
+grin_core = { git = "https://github.com/gottstech/grin", tag = "v2.0.4" }
+grin_keychain = { git = "https://github.com/gottstech/grin", tag = "v2.0.4" }
+grin_chain = { git = "https://github.com/gottstech/grin", tag = "v2.0.4" }
+grin_util = { git = "https://github.com/gottstech/grin", tag = "v2.0.4" }
+grin_api = { git = "https://github.com/gottstech/grin", tag = "v2.0.4" }
+grin_store = { git = "https://github.com/gottstech/grin", tag = "v2.0.4" }
 
 # For beta release
-#grin_core = { git = "https://github.com/gottstech/grin", tag = "v2.0.0-beta.1" }
-#grin_keychain = { git = "https://github.com/gottstech/grin", tag = "v2.0.0-beta.1" }
-#grin_chain = { git = "https://github.com/gottstech/grin", tag = "v2.0.0-beta.1" }
-#grin_util = { git = "https://github.com/gottstech/grin", tag = "v2.0.0-beta.1" }
-#grin_api = { git = "https://github.com/gottstech/grin", tag = "v2.0.0-beta.1" }
-#grin_store = { git = "https://github.com/gottstech/grin", tag = "v2.0.0-beta.1" }
+#grin_core = { git = "https://github.com/gottstech/grin", tag = "v2.0.4-beta.1" }
+#grin_keychain = { git = "https://github.com/gottstech/grin", tag = "v2.0.4-beta.1" }
+#grin_chain = { git = "https://github.com/gottstech/grin", tag = "v2.0.4-beta.1" }
+#grin_util = { git = "https://github.com/gottstech/grin", tag = "v2.0.4-beta.1" }
+#grin_api = { git = "https://github.com/gottstech/grin", tag = "v2.0.4-beta.1" }
+#grin_store = { git = "https://github.com/gottstech/grin", tag = "v2.0.4-beta.1" }
 
 # For bleeding edge
-#grin_core = { git = "https://github.com/mimblewimble/grin", branch = "milestone/2.0.0" }
-#grin_keychain = { git = "https://github.com/mimblewimble/grin", branch = "milestone/2.0.0" }
-#grin_chain = { git = "https://github.com/mimblewimble/grin", branch = "milestone/2.0.0" }
-#grin_util = { git = "https://github.com/mimblewimble/grin", branch = "milestone/2.0.0" }
-#grin_api = { git = "https://github.com/mimblewimble/grin", branch = "milestone/2.0.0" }
-#grin_store = { git = "https://github.com/mimblewimble/grin", branch = "milestone/2.0.0" }
+#grin_core = { git = "https://github.com/gottstech/grin", branch = "milestone/2.0.0" }
+#grin_keychain = { git = "https://github.com/gottstech/grin", branch = "milestone/2.0.0" }
+#grin_chain = { git = "https://github.com/gottstech/grin", branch = "milestone/2.0.0" }
+#grin_util = { git = "https://github.com/gottstech/grin", branch = "milestone/2.0.0" }
+#grin_api = { git = "https://github.com/gottstech/grin", branch = "milestone/2.0.0" }
+#grin_store = { git = "https://github.com/gottstech/grin", branch = "milestone/2.0.0" }
 
 # For local testing
-#grin_core = { path = "../../../mimblewimble/grin/core"}
-#grin_keychain = { path = "../../../mimblewimble/grin/keychain"}
-#grin_chain = { path = "../../../mimblewimble/grin/chain"}
-#grin_util = { path = "../../../mimblewimble/grin/util"}
-#grin_api = { path = "../../../mimblewimble/grin/api"}
-#grin_store = { path = "../../../mimblewimble/grin/store"}
+#grin_core = { path = "../../grin/core"}
+#grin_keychain = { path = "../../grin/keychain"}
+#grin_chain = { path = "../../grin/chain"}
+#grin_util = { path = "../../grin/util"}
+#grin_api = { path = "../../grin/api"}
+#grin_store = { path = "../../grin/store"}
 
 [dev-dependencies]
 pretty_assertions = "0.5.1"
