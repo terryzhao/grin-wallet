@@ -1,13 +1,12 @@
 [package]
 name = "grin_wallet_controller"
 version = "2.0.1-beta.4"
-authors = ["Grin Developers <mimblewimble@lists.launchpad.net>"]
+authors = ["Grin Developers <mimblewimble@lists.launchpad.net>", "Gotts Developers <gotts.tech@lists.launchpad.net>"]
 description = "Controllers for grin wallet instantiation"
 license = "Apache-2.0"
-repository = "https://github.com/mimblewimble/grin-wallet"
+repository = "https://github.com/gottstech/grin-wallet"
 keywords = [ "crypto", "grin", "mimblewimble" ]
 exclude = ["**/*.grin", "**/*.grin2"]
-#build = "src/build/build.rs"
 edition = "2018"
 
 [dependencies]

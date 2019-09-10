@@ -1,10 +1,10 @@
 [package]
 name = "grin_wallet_impls"
 version = "2.0.1-beta.4"
-authors = ["Grin Developers <mimblewimble@lists.launchpad.net>"]
+authors = ["Grin Developers <mimblewimble@lists.launchpad.net>", "Gotts Developers <gotts.tech@lists.launchpad.net>"]
 description = "Concrete types derived from libwallet traits"
 license = "Apache-2.0"
-repository = "https://github.com/mimblewimble/grin-wallet"
+repository = "https://github.com/gottstech/grin-wallet"
 keywords = [ "crypto", "grin", "mimblewimble" ]
 exclude = ["**/*.grin", "**/*.grin2"]
 edition = "2018"
