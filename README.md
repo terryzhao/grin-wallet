@@ -7,12 +7,15 @@ This repo is NOT the "official" Grin Wallet implementation, but for the wallet a
 # Main Difference
 
 The main differences from the official Grin Wallet:
-- Embedded [GrinRelay address service](https://github.com/gigglewallet/grinrelay/wiki), for easier grin transaction for common users.
+- Embedded [GrinRelay address service](https://github.com/gottstech/grinrelay/wiki), for easier grin transaction for common users.
 - Embedded default node API service, to avoid to install a Grin node server which is not necessary for common wallet users.
-- Provide mobile wallet APIs for mobile Apps developer.
+- Provide mobile/desktop wallet APIs for App developer.
+  - IOS Lib: https://github.com/gottstech/cocoa_grinwallet
   - Swift / ObjectiveC / React-Native [APIs for IOS](https://github.com/gottstech/cocoa_grinwallet/wiki)
   - Android (to be added)
-- The defaul wallet data folder is `~/.grin.w/`, instead of `~/.grin`.  
+  - Desktop NodeJS Lib: https://github.com/gottstech/grinwallet-nodejs
+- The defaul wallet data folder is `~/.grin.w/`, instead of `~/.grin`.
+- All kinds of improvements, experience it from here: https://github.com/gottstech/grin-wallet/releases
 
 # User Guide
 
