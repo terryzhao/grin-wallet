@@ -35,7 +35,7 @@ case "${CI_JOB}" in
                 cargo build --release
                 readonly ARCHIVE_CMD="tar zcf"
                 readonly BIN_SUFFIX=""
-                readonly PKG_NAME="grin-wallet-${REPO_TAG}-${JOB_ID}-linux-amd64"
+                readonly PKG_NAME="grinwallet-${REPO_TAG}-${JOB_ID}-linux-amd64"
                 readonly PKG_SUFFIX=".tgz"
                 ;;
 
@@ -45,7 +45,7 @@ case "${CI_JOB}" in
                 cargo build --release
                 readonly ARCHIVE_CMD="tar zcf"
                 readonly BIN_SUFFIX=""
-                readonly PKG_NAME="grin-wallet-${REPO_TAG}-${JOB_ID}-osx"
+                readonly PKG_NAME="grinwallet-${REPO_TAG}-${JOB_ID}-osx"
                 readonly PKG_SUFFIX=".tgz"
                 ;;
 
@@ -56,7 +56,7 @@ case "${CI_JOB}" in
                 cargo build --release
                 readonly ARCHIVE_CMD="7z a -tzip"
                 readonly BIN_SUFFIX=".exe"
-                readonly PKG_NAME="grin-wallet-${REPO_TAG}-${JOB_ID}-win-x64"
+                readonly PKG_NAME="grinwallet-${REPO_TAG}-${JOB_ID}-win-x64"
                 readonly PKG_SUFFIX=".zip"
                 ;;
 
@@ -69,7 +69,7 @@ case "${CI_JOB}" in
 
         cd ./target/release/ || exit 1
         rm -f -- *"${PKG_SUFFIX}"
-        ${ARCHIVE_CMD} "${PKG_NAME}${PKG_SUFFIX}" "grin-wallet${BIN_SUFFIX}"
+        ${ARCHIVE_CMD} "${PKG_NAME}${PKG_SUFFIX}" "grinwallet${BIN_SUFFIX}"
         ls -ls -- *${PKG_SUFFIX} | cut -d' ' -f6-
         [[ "$OS_NAME" = "linux" || "$OS_NAME" = "osx" ]] && shasum "${PKG_NAME}${PKG_SUFFIX}" > "${PKG_NAME}${PKG_SUFFIX}-shasum.txt"
         [ "$OS_NAME" = "windows" ] && CertUtil -hashfile "${PKG_NAME}${PKG_SUFFIX}" SHA256 > "${PKG_NAME}${PKG_SUFFIX}-shasum.txt"
